@@ -12,7 +12,7 @@ const CONFIG = {
     authUrl: 'https://bots.qq.com/app/getAppAccessToken',
     apiBase: 'https://api.sgroup.qq.com',
   },
-  userOpenId: 'E8A2B08CA66E4223B81E2B462305D632',
+  userOpenId: require(__ROOT + '/tools/shared_config.cjs').userOpenId,
 }
 
 // 课程表数据

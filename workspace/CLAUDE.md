@@ -109,12 +109,12 @@ node ../tools/reminder_manager.cjs status "任务名或ID"
 - 用户说"完成了/做完了" -> done 命令标记
 - 相对日期必须转绝对日期存储
 - 创建后告诉用户: 任务ID、提醒时间/频率策略、如何标记完成
-- userId 固定用: E8A2B08CA66E4223B81E2B462305D632
+- userId 固定用: 你的用户 OpenID（见 .env 中 DEFAULT_USER_OPENID）
 
 ### 5. QQ 消息推送
 ```bash
 # 通过 stdin 管道发送（推荐，支持换行）
-echo "消息内容" | node ../tools/send_qq.cjs "E8A2B08CA66E4223B81E2B462305D632"
+echo "消息内容" | node ../tools/send_qq.cjs "你的用户OpenID"
 
 # 智能分段发送（长消息自动拆多条）
 echo "很长的消息" | node ../tools/send_qq_smart.cjs "openid" [c2c|group]
