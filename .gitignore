@@ -1,0 +1,45 @@
+# 环境与密钥
+.env
+
+# 依赖
+node_modules/
+bun.lock
+package-lock.json
+
+# 运行时数据
+sessions.json
+task_queue.json
+logs/
+workspace/uploads/*
+workspace/output/*
+workspace/progress/
+workspace/scheduled_tasks.json
+workspace/scheduled_tasks/courses/schedule.json
+workspace/scheduled_tasks/reminders/
+workspace/scheduled_tasks/deadlines/
+
+# 保留目录结构
+!workspace/uploads/.gitkeep
+!workspace/output/.gitkeep
+
+# 备份
+backups/
+
+# 个人数据（记忆、会话记录、历史）
+workspace/memory/
+workspace/session_notes/
+history/
+
+# 临时文件
+*.bak
+*.bak.*
+workspace/hello.txt
+
+# 大文件
+claude-code-main.zip
+fix_qqbot.sh
+
+# 系统
+.DS_Store
+*.swp
+*~
