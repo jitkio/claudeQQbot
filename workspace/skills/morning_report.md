@@ -7,19 +7,19 @@
 ### 1. 获取信息
 并行搜索多个维度：
 ```bash
-node /home/ubuntu/claudeqqbot/tools/multi_search.cjs "今日新闻要闻" "今日天气合肥" "科技新闻今日"
+node ../tools/multi_search.cjs "今日新闻要闻" "今日天气" "科技新闻今日"
 ```
 
 ### 2. 读取今日课程
-读取 /home/ubuntu/claudeqqbot/tools/remind_class.cjs 获取课程表数据，
+读取 ../tools/remind_class.cjs 获取课程表数据，
 根据当前日期和周数计算今天有什么课。
 
 ### 3. 读取待办任务
-读取 /home/ubuntu/claudeqqbot/workspace/scheduled_tasks.json 获取今天的定时任务。
+读取 ../workspace/scheduled_tasks.json 获取今天的定时任务。
 
 ### 4. 输出格式（纯文本）
 
-早上好，拙华！
+早上好！
 
 【今日课程】第X周 周X
 - 课程名 | 节次 | 教室 | 教师

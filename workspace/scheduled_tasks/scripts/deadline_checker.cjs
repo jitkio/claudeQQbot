@@ -12,12 +12,13 @@ const path = require('path')
 const DEADLINES_FILE = path.join(__dirname, '../deadlines/deadlines.json')
 const REMINDERS_FILE = path.join(__dirname, '../reminders/reminders.json')
 
+const sharedConfig = require(__dirname + '/../../../tools/shared_config.cjs')
 const config = {
-  appId: '102075425',
-  clientSecret: 'hwCSj0IbuEYtEawJh5UuKlDf8c6b7dAi',
+  appId: sharedConfig.appId,
+  clientSecret: sharedConfig.clientSecret,
   authUrl: 'https://bots.qq.com/app/getAppAccessToken',
   apiBase: 'https://api.sgroup.qq.com',
-  userOpenId: 'E8A2B08CA66E4223B81E2B462305D632',
+  userOpenId: sharedConfig.userOpenId,
 }
 
 function readJSON(file) {
