@@ -2,6 +2,11 @@ import type { ToolDef } from '../engine/types.js'
 import { readdirSync, statSync } from 'fs'
 import { resolve, join, relative } from 'path'
 
+interface GlobArgs {
+  pattern: string
+  path?: string
+}
+
 export const globTool: ToolDef = {
   name: 'glob',
   isReadOnly: true,
@@ -16,8 +21,8 @@ export const globTool: ToolDef = {
     required: ['pattern'],
   },
   async execute(args, ctx) {
-    const searchDir = args.path ? resolve(ctx.workDir, args.path) : ctx.workDir
-    const pattern = args.pattern as string
+    const { pattern, path: argPath } = args as GlobArgs
+    const searchDir = argPath ? resolve(ctx.workDir, argPath) : ctx.workDir
 
     // 简单的 glob 实现
     const regex = patternToRegex(pattern)

@@ -12,6 +12,12 @@
 import type { ToolDef, ToolContext } from '../../engine/types.js'
 import { ContentFetcher } from './contentFetcher.js'
 
+interface ContentExtractArgs {
+  url: string
+  goal?: string
+  maxLength?: number
+}
+
 export const contentExtractTool: ToolDef = {
   name: 'web_extract',
   isReadOnly: true,
@@ -28,7 +34,7 @@ export const contentExtractTool: ToolDef = {
   },
 
   async execute(args, ctx) {
-    const { url, goal, maxLength = 8000 } = args
+    const { url, goal, maxLength = 8000 } = args as ContentExtractArgs
     if (!url) return '[错误] 请提供 URL'
 
     const fetcher = new ContentFetcher()

@@ -1,7 +1,4 @@
-import type { ToolDef } from '../types.js'
-import type { PermissionContext } from '../permission/permissionTypes.js'
-import type { UserConfirmBridge } from '../permission/userConfirmBridge.js'
-import type { AuditLog } from '../permission/auditLog.js'
+import type { ToolDef, ToolContext } from '../types.js'
 
 /** 模型返回的单个工具调用（在 adapter 层已经解析过） */
 export interface ToolCallInfo {
@@ -36,18 +33,12 @@ export interface RunToolsResult {
   abortedCallCount: number
 }
 
-/** 工具执行的 context（透传给每个工具的 execute 方法） */
-export interface ToolExecutionContext {
-  workDir: string
-  timeout: number
-  abortSignal: AbortSignal
-  // 以下字段由上层专项注入，本专项只需要透传
-  permissionContext?: PermissionContext
-  confirmBridge?: UserConfirmBridge
-  auditLog?: AuditLog
+/** 工具执行的 context（透传给每个工具的 execute 方法），继承 ToolContext 的所有字段 */
+export interface ToolExecutionContext extends ToolContext {
   memory?: unknown               // 由记忆专项填充
-  userId?: string
-  sessionKey?: string
+  // 规划系统字段（由 agentEngine 注入，todoWrite 工具使用）
+  todoReminderTracker?: unknown   // TodoReminderTracker 实例
+  isSubAgent?: boolean            // 是否为子 Agent（影响 verification nudge）
 }
 
 /** 流式文本 chunk */

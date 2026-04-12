@@ -23,6 +23,7 @@ export const subAgentTool: ToolDef = {
   name: 'sub_agent',
   isReadOnly: false,
   isConcurrencySafe: false,
+  noPropagate: true,  // 子 Agent 不能再派子 Agent（防止无限递归）
   description: '派生一个子 Agent 执行独立子任务。子 Agent 有自己的工具集和上下文，完成后返回结果。适用于：需要多步骤处理的复杂任务、需要隔离的文件操作、需要独立搜索的调研任务。不要用于简单的单步任务。',
   parameters: {
     type: 'object',
@@ -57,12 +58,13 @@ export const subAgentTool: ToolDef = {
     const globalRegistry = createDefaultRegistry()
     const subRegistry = new ToolRegistry()
 
-    // 默认工具列表（不包含 sub_agent 自身，防止无限递归）
+    // 默认工具列表（排除 noPropagate 工具，防止递归和越权）
     const allowedTools = toolNames || ['bash', 'read_file', 'web_search', 'web_fetch']
     for (const name of allowedTools) {
-      if (name === 'sub_agent') continue  // 防止递归
       const tool = globalRegistry.get(name)
-      if (tool) subRegistry.register(tool)
+      if (!tool) continue
+      if (tool.noPropagate) continue  // 跳过不可传播的工具
+      subRegistry.register(tool)
     }
 
     // 子 Agent 用精简的 system prompt
@@ -77,13 +79,18 @@ export const subAgentTool: ToolDef = {
     console.log(`[SubAgent] 工具: ${subRegistry.names().join(', ')}`)
 
     try {
-      // 从当前上下文获取 modelConfig（通过 ctx 传递）
-      const modelConfig = (ctx as any).modelConfig || {
+      // 从当前上下文获取 modelConfig（现在 ToolContext 已有此字段）
+      const modelConfig = ctx.modelConfig || {
         provider: 'openai' as const,
         model: 'deepseek-chat',
         apiKey: process.env.OPENAI_API_KEY || process.env.DEEPSEEK_API_KEY || '',
         baseUrl: process.env.OPENAI_BASE_URL || 'https://api.deepseek.com',
       }
+
+      // 子 Agent 的 sessionKey 要隔离，不能污染主 Agent 的 memory/todo
+      const subSessionKey = ctx.sessionKey
+        ? `${ctx.sessionKey}_sub_${Math.random().toString(36).slice(2, 8)}`
+        : undefined
 
       const result = await runAgent(task, {
         modelConfig,
@@ -93,13 +100,36 @@ export const subAgentTool: ToolDef = {
         workDir: ctx.workDir,
         toolTimeout: 30000,
         registry: subRegistry,
+        // 继承自主 Agent
+        userId: ctx.userId,
+        sessionKey: subSessionKey,
+        permissionContext: ctx.permissionContext,
+        confirmBridge: ctx.confirmBridge,
+        auditLog: ctx.auditLog,
+        parentAbortSignal: ctx.abortSignal,  // 级联取消
+        isSubAgent: true,                     // 标记为子 Agent
+        agentDepth: (ctx.agentDepth || 0) + 1, // 递归深度 +1
+        // 子 Agent 不继承 memory 和 onStream
       })
 
       console.log(`[SubAgent] 完成: ${result.turnCount} 轮, ${result.toolCallCount} 次工具调用`)
 
       return `[子Agent完成] ${result.turnCount}轮, ${result.toolCallCount}次工具调用\n\n${result.content}`
     } catch (e: any) {
-      console.error(`[SubAgent] 失败: ${e.message}`)
+      console.error(`[SubAgent] 失败:`, e)
+
+      // 致命错误直接 throw，让主 Agent 也失败
+      const isFatal = /401|403|invalid api key|account disabled/i.test(e.message || '')
+      if (isFatal) {
+        throw new Error(`子 Agent 致命错误: ${e.message}`)
+      }
+
+      // 超时分类
+      const isTimeout = /timeout|aborted/i.test(e.message || '')
+      if (isTimeout) {
+        return `[子Agent超时] 子任务在 ${timeout}ms 内未完成。请尝试拆解为更小的子任务。`
+      }
+
       return `[子Agent失败] ${e.message}`
     }
   },

@@ -12,6 +12,12 @@ import type { SearchResult } from './webTypes.js'
 import { BingSearch, DuckDuckGoSearch, GoogleSearch } from './searchEngines.js'
 import { ContentFetcher } from './contentFetcher.js'
 
+interface WebSearchArgs {
+  query: string
+  numResults?: number
+  fetchContent?: boolean
+}
+
 const engines = [
   new BingSearch(),
   new DuckDuckGoSearch(),
@@ -34,8 +40,7 @@ export const webSearchTool: ToolDef = {
   },
 
   async execute(args, ctx) {
-    const { query, numResults, count, fetchContent = false } = args as any
-    const finalNum = numResults || count || 5
+    const { query, numResults = 5, fetchContent = false } = args as WebSearchArgs
     if (!query) return '[错误] 请提供搜索关键词'
 
     let results: SearchResult[] = []
@@ -45,7 +50,7 @@ export const webSearchTool: ToolDef = {
     for (const engine of engines) {
       try {
         console.log(`[WebSearch] 尝试 ${engine.name}...`)
-        results = await engine.search(query, finalNum)
+        results = await engine.search(query, numResults)
         if (results.length > 0) {
           usedEngine = engine.name
           console.log(`[WebSearch] ${engine.name} 返回 ${results.length} 条结果`)

@@ -235,7 +235,7 @@ export class ToolOrchestrator {
 
     try {
       const content = await Promise.race([
-        tool.execute(call.input as any, context as any),
+        tool.execute(call.input as Record<string, any>, context),
         new Promise<never>((_, reject) =>
           timeoutCtrl.signal.addEventListener('abort', () =>
             reject(new Error(`[超时] 工具 ${call.name} 超过 ${timeoutMs}ms`)),

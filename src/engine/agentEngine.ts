@@ -13,6 +13,10 @@ import type { AuditLog } from './permission/auditLog.js'
 import { ToolOrchestrator } from './orchestrator/toolOrchestrator.js'
 import type { ToolCallInfo, ToolExecutionContext } from './orchestrator/orchestratorTypes.js'
 
+// 规划系统
+import type { TodoStore } from './planning/todoStore.js'
+import { TodoReminderTracker } from './planning/todoReminder.js'
+
 export interface AgentEngineOptions {
   modelConfig: ModelConfig
   systemPrompt?: string
@@ -28,6 +32,17 @@ export interface AgentEngineOptions {
   permissionContext?: PermissionContext   // 权限审查上下文
   confirmBridge?: UserConfirmBridge       // QQ 二次确认桥
   auditLog?: AuditLog                     // 审计日志
+
+  // 规划系统
+  todoStore?: TodoStore                    // TodoList 存储
+  /** 外部共享的 toolHistory 数组引用，让 verify_task 能拿到 */
+  toolHistorySink?: Array<{ name: string; input: any; output: string }>
+  /** 父 Agent 的 abort 信号，用于级联取消子 Agent */
+  parentAbortSignal?: AbortSignal
+  /** 标记当前是否为子 Agent（影响 verification nudge 等行为） */
+  isSubAgent?: boolean
+  /** 当前 Agent 的递归深度（0=主 Agent，每层子 Agent +1） */
+  agentDepth?: number
 }
 
 export interface AgentResult {
@@ -59,6 +74,17 @@ export async function runAgent(
     onStream,
   } = options
 
+  // 递归深度保护：防止子 Agent 无限嵌套
+  const MAX_AGENT_DEPTH = 3
+  const currentDepth = options.agentDepth || 0
+  if (currentDepth >= MAX_AGENT_DEPTH) {
+    return {
+      content: `[错误] Agent 递归深度超过上限 (${MAX_AGENT_DEPTH})，拒绝继续派生子 Agent。`,
+      toolCallCount: 0,
+      turnCount: 0,
+    }
+  }
+
   // 创建适配器
   const adapter = createAdapter(modelConfig, workDir)
 
@@ -66,7 +92,9 @@ export async function runAgent(
   const registry = options.registry || createDefaultRegistry()
 
   // 动态工具选择：根据用户消息和模型类型选择合适的工具
-  const promptText = typeof prompt === 'string' ? prompt : prompt
+  const promptText = typeof prompt === 'string'
+    ? prompt
+    : Array.isArray(prompt) ? (prompt as any[]).filter((p: any) => p.type === 'text').map((p: any) => p.text || '').join(' ') : String(prompt)
   const allTools = registry.getAll()
   const selector = createOrchestratorSelector(allTools)
   const selection = selector.select(promptText, modelConfig.provider)
@@ -77,9 +105,10 @@ export async function runAgent(
   }
 
   // plan 模式：物理移除所有写工具，即使模型想调也调不到
+  // 但保留 exit_plan_mode（让模型能提交方案退出规划模式）
   if (options.permissionContext?.mode === 'plan') {
-    const READ_ONLY_TOOL_NAMES = ['read_file', 'glob', 'grep', 'web_search', 'web_fetch', 'web_extract', 'bash']
-    tools = tools.filter(t => READ_ONLY_TOOL_NAMES.includes(t.name))
+    const PLAN_MODE_ALLOWED = ['read_file', 'glob', 'grep', 'web_search', 'web_fetch', 'web_extract', 'bash', 'enter_plan_mode', 'exit_plan_mode', 'todo_write', 'verify_task']
+    tools = tools.filter(t => PLAN_MODE_ALLOWED.includes(t.name))
     // bash 虽然在列表里，但 permissionEngine 会在命令层面再做只读过滤
     console.log(`[Agent] plan 模式，限制工具集: ${tools.map(t => t.name).join(', ')}`)
   }
@@ -112,10 +141,18 @@ export async function runAgent(
   // 超时控制
   const abortController = new AbortController()
   const overallTimer = setTimeout(() => abortController.abort(), timeoutMs)
+  // 级联取消：父 Agent 被取消时，子 Agent 也取消
+  if (options.parentAbortSignal) {
+    options.parentAbortSignal.addEventListener('abort', () => abortController.abort(), { once: true })
+  }
 
   let toolCallCount = 0
   let turnCount = 0
   let consecutiveErrors = 0  // 连续工具错误计数
+
+  // 规划系统：初始化 reminder tracker 和 toolHistory
+  const reminderTracker = new TodoReminderTracker()
+  const toolHistory: Array<{ name: string; input: any; output: string }> = options.toolHistorySink ?? []
 
   try {
     // Agent 循环
@@ -126,8 +163,26 @@ export async function runAgent(
         throw new Error('执行超时')
       }
 
+      // 规划系统：每轮开始时递增 reminder 计数器
+      reminderTracker.onTurnStart()
+
       // 调用模型
       console.log(`[Agent] 第 ${turnCount} 轮，发送 ${messages.length} 条消息`)
+
+      // 规划系统：检查是否需要注入 todo reminder
+      if (options.todoStore && options.sessionKey) {
+        const currentTodos = options.todoStore.get(options.sessionKey)
+        if (reminderTracker.shouldInject(currentTodos)) {
+          const reminderText = reminderTracker.buildReminder(
+            currentTodos,
+            (t) => options.todoStore!.render(t),
+          )
+          // 作为一条 user 消息插入到历史末尾
+          messages.push({ role: 'user', content: reminderText })
+          reminderTracker.onReminderInjected()
+          console.log('[Planning] 已注入 todo reminder')
+        }
+      }
 
       // 检查是否需要压缩上下文
       if (options.memory?.compactor.shouldCompact(messages)) {
@@ -202,6 +257,13 @@ export async function runAgent(
         permissionContext: options.permissionContext,
         confirmBridge: options.confirmBridge,
         auditLog: options.auditLog,
+        modelConfig,                          // 让子 Agent 继承主 Agent 的模型
+        sessionKey: options.sessionKey,        // 让工具知道当前会话
+        userId: options.userId,                // 让工具知道当前用户
+        agentDepth: currentDepth,              // 让子 Agent 知道当前递归深度
+        // 规划系统：透传给工具
+        todoReminderTracker: reminderTracker,
+        isSubAgent: options.isSubAgent || false,
       }
 
       const runResult = await orchestrator.runTools(callInfos, execContext)
@@ -212,6 +274,14 @@ export async function runAgent(
         toolCallCount++
         options.memory?.notes.recordToolCall()
         console.log(`[Agent] 工具 ${result.name}: ${result.content.slice(0, 100)}${result.content.length > 100 ? '...' : ''}`)
+
+        // 规划系统：追加 toolHistory（供 verify_task 使用）
+        const matchingCall = callInfos.find(c => c.id === result.id)
+        toolHistory.push({
+          name: result.name,
+          input: matchingCall?.input,
+          output: result.content,
+        })
 
         // 将工具结果加入消息历史
         messages.push({
@@ -259,6 +329,9 @@ export async function runAgent(
   }
 }
 
+/** 控制流工具，不应该写入会话笔记 */
+const SKIP_TOOLS_FOR_NOTES = new Set(['todo_write', 'enter_plan_mode', 'exit_plan_mode', 'verify_task'])
+
 /** 异步触发会话笔记更新（不阻塞主流程） */
 function triggerNotesUpdate(
   options: AgentEngineOptions,
@@ -275,6 +348,7 @@ function triggerNotesUpdate(
   if (options.memory.notes.shouldUpdate(tokens, lastAssistantHasTools)) {
     const conversationText = messages
       .filter(m => m.role !== 'system')
+      .filter(m => !(m.role === 'tool' && m.name && SKIP_TOOLS_FOR_NOTES.has(m.name)))
       .map(m => `[${m.role}] ${typeof m.content === 'string' ? m.content.slice(0, 300) : '(附件)'}`)
       .join('\n')
 

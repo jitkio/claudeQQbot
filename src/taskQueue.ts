@@ -5,6 +5,8 @@ import { CONFIG, PROJECT_ROOT } from './config.js'
 import { runAgent } from './engine/agentEngine.js'
 import type { ModelConfig } from './engine/types.js'
 import { MemoryManager } from './engine/memory/memoryManager.js'
+import { TodoStore } from './engine/planning/todoStore.js'
+import { createDefaultRegistry } from './engine/toolRegistry.js'
 
 import { PermissionModeManager } from './engine/permission/permissionMode.js'
 import { UserConfirmBridge } from './engine/permission/userConfirmBridge.js'
@@ -44,6 +46,7 @@ function detectOutputFiles(resp: string): string[] {
 
 const modeManager = new PermissionModeManager(CONFIG.claude.workDir)
 const auditLog = new AuditLog(CONFIG.claude.workDir)
+const todoStore = new TodoStore(CONFIG.claude.workDir)
 
 /** 发送 QQ 消息的辅助函数（给 confirmBridge 用） */
 function sendQQMessage(targetId: string, text: string): void {
@@ -63,8 +66,8 @@ const confirmBridge = new UserConfirmBridge(
   60000,
 )
 
-/** 导出 modeManager 和 confirmBridge 供 index.ts 使用 */
-export { modeManager, confirmBridge }
+/** 导出 modeManager、confirmBridge、todoStore 供 index.ts 使用 */
+export { modeManager, confirmBridge, todoStore }
 
 // ==================== 类型 ====================
 
@@ -127,6 +130,8 @@ export function resetSession(key: string) {
     const memory = new MemoryManager(key, '', CONFIG.claude.workDir, CONFIG.model.maxTokens || 8192)
     memory.notes.reset()
   } catch {}
+  // 重置规划系统的 todo 清单
+  try { todoStore.clear(key) } catch {}
 }
 
 // 启动时加载队列
@@ -280,11 +285,11 @@ async function executeTask(task: Task): Promise<string> {
   const provider = CONFIG.model.provider
 
   // 非 claude_code 模式 → 走 Agent Engine
-  if (provider !== 'claude_code' && provider !== ('claude_code_proxy' as any)) {
+  if (provider !== 'claude_code') {
     return executeWithAgentEngine(task)
   }
 
-  // claude_code / claude_code_proxy 模式 → 走现有 spawn claude 逻辑
+  // claude_code 模式 → 走现有 spawn claude 逻辑
   return executeWithClaudeCode(task)
 }
 
@@ -354,6 +359,33 @@ async function executeWithAgentEngine(task: Task): Promise<string> {
     bypassEnvFlag: process.env.BYPASS_PERMISSIONS === 'true',
   }
 
+  // 规划系统：为本次任务创建共享的 toolHistory
+  const toolHistory: Array<{ name: string; input: any; output: string }> = []
+
+  // 创建带规划系统的工具注册表
+  const registry = createDefaultRegistry({
+    todoStore,
+    modeManager,
+    confirmBridge,
+    getSessionContext: () => ({
+      sessionKey: task.sessionKey,
+      userId: task.userId,
+      originalRequest: task.prompt,
+      toolHistory,
+    }),
+    generateForVerification: async (systemPrompt, userPrompt) => {
+      // 用一次廉价 adapter 调用做核验，不带任何工具
+      const { OpenAIAdapter } = await import('./adapters/openai.js')
+      const adapter = new OpenAIAdapter(modelConfig)
+      const r = await adapter.chat(
+        [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+        [],
+        {},
+      )
+      return r.content
+    },
+  })
+
   const result = await runAgent(task.prompt, {
     modelConfig,
     systemPrompt,
@@ -363,10 +395,13 @@ async function executeWithAgentEngine(task: Task): Promise<string> {
     toolTimeout: 60000,
     userId: task.userId,
     sessionKey: task.sessionKey,
-    memory,            // 传入三层记忆管理器
-    permissionContext,  // 传入权限上下文
-    confirmBridge,      // 传入二次确认桥
-    auditLog,           // 传入审计日志
+    registry,             // 传入带规划工具的注册表
+    memory,               // 传入三层记忆管理器
+    permissionContext,     // 传入权限上下文
+    confirmBridge,         // 传入二次确认桥
+    auditLog,              // 传入审计日志
+    todoStore,             // 传入 TodoStore
+    toolHistorySink: toolHistory,  // 共享同一份引用
   })
 
   // 任务完成后，异步提取用户画像（不阻塞返回）
@@ -561,6 +596,6 @@ setInterval(() => {
 setInterval(() => {
   try {
     const { execSync } = require('child_process')
-    execSync('node ${PROJECT_ROOT}/tools/cleanup_session_notes.cjs', { encoding: 'utf-8', timeout: 10000 })
+    execSync(`node ${PROJECT_ROOT}/tools/cleanup_session_notes.cjs`, { encoding: 'utf-8', timeout: 10000 })
   } catch {}
 }, 86400000)

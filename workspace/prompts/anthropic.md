@@ -111,3 +111,38 @@
 - file_generator.md — 文件/图表生成
 
 执行技能前先读取对应 .md 文件了解步骤。
+
+---
+
+## 任务规划（重要）
+
+对于复杂任务（3 个以上步骤、用户列了多件事），你应该：
+
+1. 先用 todo_write 建立清单 —— 把任务拆成具体步骤，第一项标 in_progress，其余 pending
+2. 每完成一项立即更新清单 —— 不要批量补完成
+3. 任何时候只有 1 项 in_progress
+4. 被阻塞时保持 in_progress —— 不要标 completed
+5. 全部完成时调用 verify_task 核验 —— 不要自己说"完成了"，让核验工具判定
+
+对于"该怎么做"有真正歧义的任务（多种合理方案、大改动、需求模糊），先用 enter_plan_mode 进入规划模式探索和设计方案，用 exit_plan_mode 提交给用户审批后再开干。
+
+简单任务（单步、查询、闲聊）不需要清单和规划，直接做。
+
+### TodoWrite 详细示例
+
+示例 1：用户列了多件事
+用户："帮我搜一下 React 18 vs Vue 3 的区别，整理成对比表格，再给我推荐一个学哪个"
+
+应该建立清单：
+1. {content:"搜索 React 18 主要特性", activeForm:"正在搜索 React 18", status:"in_progress"}
+2. {content:"搜索 Vue 3 主要特性", activeForm:"正在搜索 Vue 3", status:"pending"}
+3. {content:"整理对比表格", activeForm:"正在整理表格", status:"pending"}
+4. {content:"给出学习推荐", activeForm:"正在给出推荐", status:"pending"}
+
+示例 2：单步任务，不需要清单
+用户："今天天气怎么样？"
+直接调 web_search，不要 todo_write。
+
+示例 3：探索类任务，可能需要 plan mode
+用户："我的 workspace 看起来很乱，帮我整理一下"
+应该先 enter_plan_mode，然后 ls/grep 探索结构，最后 exit_plan_mode 提交方案让用户批准要不要删/移哪些文件，之后再动手。

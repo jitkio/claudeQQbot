@@ -2,29 +2,49 @@ import type { ToolDef, ToolContext } from '../engine/types.js'
 import { spawn } from 'child_process'
 import { checkBashCommand } from '../engine/permission/permissionEngine.js'
 import { interpretExitCode } from '../engine/permission/commandSemantics.js'
+import { parseCommand } from '../engine/permission/commandParser.js'
+import { isParsedCommandReadOnly } from '../engine/permission/readOnlyRegistry.js'
 import type { PermissionContext } from '../engine/permission/permissionTypes.js'
+
+interface BashArgs {
+  command: string
+  timeout?: number
+}
 
 export const bashTool: ToolDef = {
   name: 'bash',
   /**
-   * bash 的只读性取决于命令内容，动态判定
-   * 参照 readOnlyRegistry.isParsedCommandReadOnly 的逻辑
+   * bash 的只读性取决于命令内容，复用 permissionEngine 的完整判定
    */
   isReadOnly: (input: any) => {
-    const cmd = (input?.command || '').trim().toLowerCase()
-    const readOnlyPrefixes = ['ls', 'cat', 'head', 'tail', 'grep', 'find', 'wc', 'file', 'which', 'whoami', 'pwd', 'echo', 'date', 'uptime', 'df', 'du', 'free', 'env', 'printenv', 'type', 'stat', 'uname']
-    const firstWord = cmd.split(/\s+/)[0]?.replace(/^(sudo\s+)/, '') || ''
-    return readOnlyPrefixes.includes(firstWord)
+    try {
+      const cmd = (input?.command || '').trim()
+      if (!cmd) return false
+      const parsed = parseCommand(cmd)
+      return isParsedCommandReadOnly(parsed)
+    } catch {
+      return false
+    }
   },
   /**
-   * bash 的并发安全性 = 只读命令才安全
-   * 写操作（rm、mv、cp、apt install 等）必须串行
+   * 并发安全 = 只读（读操作可以并发，写操作绝对不能）
+   * 但 apt/dpkg 等即使是 list 也涉及 dpkg 锁，不并发
    */
   isConcurrencySafe: (input: any) => {
-    const cmd = (input?.command || '').trim().toLowerCase()
-    const readOnlyPrefixes = ['ls', 'cat', 'head', 'tail', 'grep', 'find', 'wc', 'file', 'which', 'whoami', 'pwd', 'echo', 'date', 'uptime', 'df', 'du', 'free', 'env', 'printenv', 'type', 'stat', 'uname']
-    const firstWord = cmd.split(/\s+/)[0]?.replace(/^(sudo\s+)/, '') || ''
-    return readOnlyPrefixes.includes(firstWord)
+    try {
+      const cmd = (input?.command || '').trim()
+      if (!cmd) return false
+      const parsed = parseCommand(cmd)
+      if (!isParsedCommandReadOnly(parsed)) return false
+      // 包管理器即使只读也涉及锁文件，不并发
+      const lockSensitive = ['apt', 'apt-get', 'dpkg', 'yum', 'dnf', 'pacman', 'brew']
+      for (const sc of parsed.subcommands) {
+        if (lockSensitive.includes(sc.baseCommand)) return false
+      }
+      return true
+    } catch {
+      return false
+    }
   },
   description: '执行 shell 命令。可以运行任何 Linux/Windows 命令，如 ls、cat、grep、python、node 等。',
   parameters: {
@@ -36,8 +56,8 @@ export const bashTool: ToolDef = {
     required: ['command'],
   },
   async execute(args: Record<string, any>, ctx: ToolContext): Promise<string> {
-    const command = args.command as string
-    const timeout = (args.timeout as number) || 30000
+    const { command, timeout: argTimeout } = args as BashArgs
+    const timeout = argTimeout || 30000
     const permCtx: PermissionContext | undefined = ctx.permissionContext
 
     // ========== 权限审查 ==========

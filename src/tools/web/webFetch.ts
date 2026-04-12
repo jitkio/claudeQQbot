@@ -7,6 +7,11 @@
 import type { ToolDef } from '../../engine/types.js'
 import { ContentFetcher } from './contentFetcher.js'
 
+interface WebFetchArgs {
+  url: string
+  maxLength?: number
+}
+
 export const webFetchTool: ToolDef = {
   name: 'web_fetch',
   isReadOnly: true,
@@ -21,7 +26,7 @@ export const webFetchTool: ToolDef = {
     required: ['url'],
   },
   async execute(args, ctx) {
-    const { url, maxLength = 10000 } = args
+    const { url, maxLength = 10000 } = args as WebFetchArgs
     if (!url) return '[错误] 请提供 URL'
 
     const fetcher = new ContentFetcher()

@@ -1,9 +1,7 @@
-import { startBot, replyMessage, splitMessage, downloadAttachment } from './qq.js'
+import { startBot, replyMessage, downloadAttachment } from './qq.js'
 import type { IncomingMessage } from './qq.js'
-import { addTask, getUserTasks, getQueueStatus, cancelTask, resetSession, modeManager, confirmBridge } from './taskQueue.js'
+import { addTask, getUserTasks, getQueueStatus, cancelTask, resetSession, modeManager, confirmBridge, todoStore } from './taskQueue.js'
 import { CONFIG, PROJECT_ROOT } from './config.js'
-import { existsSync } from 'fs'
-import { basename } from 'path'
 import { UserProfileManager } from './engine/memory/userProfile.js'
 import { MODE_DESCRIPTIONS } from './engine/permission/permissionTypes.js'
 import type { PermissionMode } from './engine/permission/permissionTypes.js'
@@ -38,6 +36,7 @@ function isInstantCommand(text: string): string | null {
   if (t === '/auto') return 'mode:auto'
   if (t === '/free') return 'mode:default'
   if (t === '/mode' || t === '权限模式') return 'mode:show'
+  if (t === '/todos' || t === '清单' || t === '待办') return 'todos'
   return null
 }
 
@@ -56,7 +55,7 @@ async function handleInstant(cmd: string, text: string, msg: IncomingMessage): P
       return '已开启全新对话。'
 
     case 'help':
-      return `🤖 你的 AI 秘书\n\n发消息就行，我会立刻收下然后后台处理，完成后主动通知你。\n\n📎 发图片/文件 → 识别分析\n🔍 搜索信息 → 浏览器搜索\n📅 课程表 → 自动设提醒\n📊 图表/文档 → 生成文件\n⏰ 定时任务 → 自然语言\n\n指令:\n/tasks - 查看任务队列\n/cancel ID - 取消任务\n/new - 新对话\n/status - 状态\n/done 名称 - 打卡完成\n/remind - 提醒列表\n/memory - 查看记忆\n/forget - 清除记忆\n/mode - 查看权限模式\n/plan - 规划模式(只读)\n/auto - 自动模式\n/strict - 严格模式\n/free - 默认模式\n/help - 帮助`
+      return `🤖 你的 AI 秘书\n\n发消息就行，我会立刻收下然后后台处理，完成后主动通知你。\n\n📎 发图片/文件 → 识别分析\n🔍 搜索信息 → 浏览器搜索\n📅 课程表 → 自动设提醒\n📊 图表/文档 → 生成文件\n⏰ 定时任务 → 自然语言\n\n指令:\n/tasks - 查看任务队列\n/cancel ID - 取消任务\n/new - 新对话\n/status - 状态\n/done 名称 - 打卡完成\n/remind - 提醒列表\n/memory - 查看记忆\n/forget - 清除记忆\n/todos - 查看待办清单\n/mode - 查看权限模式\n/plan - 规划模式(只读)\n/auto - 自动模式\n/strict - 严格模式\n/free - 默认模式\n/help - 帮助`
 
     case 'tasks': {
       const userTasks = getUserTasks(sk)
@@ -80,7 +79,7 @@ async function handleInstant(cmd: string, text: string, msg: IncomingMessage): P
     case 'remind': {
       try {
         const { execSync } = require('child_process')
-        const out = execSync('node ${PROJECT_ROOT}/tools/reminder_manager.cjs list', { encoding: 'utf-8', timeout: 10000 })
+        const out = execSync(`node ${PROJECT_ROOT}/tools/reminder_manager.cjs list`, { encoding: 'utf-8', timeout: 10000 })
         return out.trim() || '当前没有提醒任务'
       } catch { return '查询失败' }
     }
@@ -141,6 +140,14 @@ async function handleInstant(cmd: string, text: string, msg: IncomingMessage): P
       return `✅ 已切换到 ${newMode} 模式\n${MODE_DESCRIPTIONS[newMode]}`
     }
 
+    case 'todos': {
+      const todos = todoStore.get(sk)
+      if (todos.length === 0) {
+        return '当前没有待办清单。下次我处理多步任务时会自动建立清单。'
+      }
+      return `当前任务清单:\n${todoStore.render(todos)}`
+    }
+
     default: return ''
   }
 }
@@ -163,10 +170,12 @@ function buildPrompt(text: string, filePaths: string[]): string {
   return `用户发送了文件:\n${desc}\n\n用户消息: ${text || '（请分析文件内容）'}`
 }
 
+import { TimedSet } from './engine/utils/timedSet.js'
+
 // ==================== 消息去重 ====================
 
-const recentMsgIds = new Set<string>()
-const recentContentKeys = new Set<string>()
+const recentMsgIds = new TimedSet()
+const recentContentKeys = new TimedSet()
 
 // ==================== 主消息处理（异步，永不阻塞）====================
 
@@ -176,8 +185,7 @@ async function handleMessage(msg: IncomingMessage) {
     console.log(`[Dedup] 跳过重复msgId: ${msg.msgId}`)
     return
   }
-  recentMsgIds.add(msg.msgId)
-  setTimeout(() => recentMsgIds.delete(msg.msgId), 120000)
+  recentMsgIds.add(msg.msgId, 120000)
 
   // 按 用户+内容 去重（10秒窗口，防止 QQ 用不同msgId推送同一条消息）
   const contentKey = `${msg.userOpenId || msg.senderOpenId || 'unknown'}_${msg.content.trim().slice(0, 50)}`
@@ -185,8 +193,7 @@ async function handleMessage(msg: IncomingMessage) {
     console.log(`[Dedup] 跳过重复内容: ${contentKey}`)
     return
   }
-  recentContentKeys.add(contentKey)
-  setTimeout(() => recentContentKeys.delete(contentKey), 10000)
+  recentContentKeys.add(contentKey, 10000)
 
   // 清理群消息中的 @bot 标记
   const rawText = msg.content.replace(/<@!?\w+>/g, '').trim()
@@ -244,7 +251,7 @@ async function handleMessage(msg: IncomingMessage) {
 
 // ==================== 启动 ====================
 
-const modelInfo = CONFIG.model.provider === 'claude_code' || CONFIG.model.provider === ('claude_code_proxy' as any)
+const modelInfo = CONFIG.model.provider === 'claude_code'
   ? 'Claude Code CLI'
   : `${CONFIG.model.provider}/${CONFIG.model.name || '(未配置模型名)'}`
 

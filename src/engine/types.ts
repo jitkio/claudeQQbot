@@ -46,6 +46,9 @@ export interface ToolDef {
    * Bash 这种需要动态判定的用函数形式（根据 input 内容决定）
    */
   isConcurrencySafe?: boolean | ((input: any) => boolean)
+
+  /** 子 Agent 不应该继承这个工具（避免递归 / 避免子 Agent 越权） */
+  noPropagate?: boolean
 }
 
 // 工具执行上下文
@@ -56,6 +59,14 @@ export interface ToolContext {
   permissionContext?: import('./permission/permissionTypes.js').PermissionContext
   confirmBridge?: import('./permission/userConfirmBridge.js').UserConfirmBridge
   auditLog?: import('./permission/auditLog.js').AuditLog
+  /** 主 Agent 当前使用的模型配置，用于子 Agent 继承 */
+  modelConfig?: ModelConfig
+  /** 主 Agent 的 sessionKey，用于子 Agent 继承会话隔离 */
+  sessionKey?: string
+  /** 主 Agent 的 userId，用于子 Agent 继承用户归属 */
+  userId?: string
+  /** 当前 Agent 的递归深度（0=主 Agent） */
+  agentDepth?: number
 }
 
 // 模型响应

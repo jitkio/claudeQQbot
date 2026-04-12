@@ -2,6 +2,12 @@ import type { ToolDef } from '../engine/types.js'
 import { spawn } from 'child_process'
 import { resolve } from 'path'
 
+interface GrepArgs {
+  pattern: string
+  path?: string
+  include?: string
+}
+
 export const grepTool: ToolDef = {
   name: 'grep',
   isReadOnly: true,
@@ -17,9 +23,8 @@ export const grepTool: ToolDef = {
     required: ['pattern'],
   },
   async execute(args, ctx) {
-    const searchDir = args.path ? resolve(ctx.workDir, args.path) : ctx.workDir
-    const pattern = args.pattern as string
-    const include = args.include as string | undefined
+    const { pattern, path: argPath, include } = args as GrepArgs
+    const searchDir = argPath ? resolve(ctx.workDir, argPath) : ctx.workDir
 
     return new Promise((res) => {
       const cmdArgs = ['-rn', '--max-count=50']

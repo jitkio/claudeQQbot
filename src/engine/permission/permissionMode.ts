@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
 import type { PermissionMode } from './permissionTypes.js'
+import { safeSessionKey } from '../utils/sessionKey.js'
 
 /**
  * 会话级的权限模式管理
@@ -15,7 +16,7 @@ export class PermissionModeManager {
   }
 
   private pathFor(sessionKey: string): string {
-    return `${this.modeDir}/${sessionKey}.json`
+    return `${this.modeDir}/${safeSessionKey(sessionKey)}.json`
   }
 
   /** 读取某会话当前模式 */

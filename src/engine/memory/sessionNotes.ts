@@ -12,6 +12,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
 import { SESSION_NOTES_TEMPLATE, buildNotesUpdatePrompt } from './prompts.js'
 import type { MemoryConfig } from './memoryTypes.js'
 import { DEFAULT_MEMORY_CONFIG } from './memoryTypes.js'
+import { safeSessionKey } from '../utils/sessionKey.js'
 
 export class SessionNotesManager {
   private notesDir: string
@@ -25,7 +26,7 @@ export class SessionNotesManager {
   private isExtracting = false
 
   constructor(sessionKey: string, baseDir: string, config?: Partial<MemoryConfig>) {
-    this.notesDir = `${baseDir}/memory/${sessionKey}`
+    this.notesDir = `${baseDir}/memory/${safeSessionKey(sessionKey)}`
     this.notesPath = `${this.notesDir}/notes.md`
     this.config = { ...DEFAULT_MEMORY_CONFIG, ...config }
     mkdirSync(this.notesDir, { recursive: true })

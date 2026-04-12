@@ -11,6 +11,8 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
 import type { UserProfile } from './memoryTypes.js'
 import { buildProfileExtractionPrompt } from './prompts.js'
+import { safeSessionKey } from '../utils/sessionKey.js'
+import { fileMutex } from '../utils/fileMutex.js'
 
 export class UserProfileManager {
   private profileDir: string
@@ -21,9 +23,7 @@ export class UserProfileManager {
   }
 
   private getPath(userId: string): string {
-    // 清理 userId 中的特殊字符
-    const safe = userId.replace(/[^a-zA-Z0-9_-]/g, '_')
-    return `${this.profileDir}/${safe}.json`
+    return `${this.profileDir}/${safeSessionKey(userId)}.json`
   }
 
   load(userId: string): UserProfile {
@@ -58,6 +58,7 @@ export class UserProfileManager {
     conversationSnippet: string,
     generateFn: (prompt: string) => Promise<string>,
   ): Promise<void> {
+    await fileMutex.withLock(`profile_${userId}`, async () => {
     try {
       const prompt = buildProfileExtractionPrompt(conversationSnippet)
       const raw = await generateFn(prompt)
@@ -112,6 +113,7 @@ export class UserProfileManager {
     } catch (e: any) {
       console.error(`[Profile] 画像提取失败: ${e.message}`)
     }
+    }) // end withLock
   }
 
   /** 构建注入到 prompt 中的画像上下文 */
