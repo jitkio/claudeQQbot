@@ -43,3 +43,7 @@ fix_qqbot.sh
 .DS_Store
 *.swp
 *~
+
+# 本地配置和用户数据
+.claude/settings.local.json
+workspace/profiles/
