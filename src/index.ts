@@ -1,9 +1,12 @@
 import { startBot, replyMessage, splitMessage, downloadAttachment } from './qq.js'
 import type { IncomingMessage } from './qq.js'
-import { addTask, getUserTasks, getQueueStatus, cancelTask, resetSession } from './taskQueue.js'
+import { addTask, getUserTasks, getQueueStatus, cancelTask, resetSession, modeManager, confirmBridge } from './taskQueue.js'
 import { CONFIG, PROJECT_ROOT } from './config.js'
 import { existsSync } from 'fs'
 import { basename } from 'path'
+import { UserProfileManager } from './engine/memory/userProfile.js'
+import { MODE_DESCRIPTIONS } from './engine/permission/permissionTypes.js'
+import type { PermissionMode } from './engine/permission/permissionTypes.js'
 
 // ==================== 辅助函数 ====================
 
@@ -28,6 +31,13 @@ function isInstantCommand(text: string): string | null {
   if (t.startsWith('/cancel ')) return 'cancel'
   if (t === '/remind' || t === '提醒列表') return 'remind'
   if (t.startsWith('/done ') || t.startsWith('完成 ')) return 'done'
+  if (t === '/memory' || t === '记忆') return 'memory'
+  if (t === '/forget' || t === '忘记我') return 'forget'
+  if (t === '/plan') return 'mode:plan'
+  if (t === '/strict') return 'mode:strict'
+  if (t === '/auto') return 'mode:auto'
+  if (t === '/free') return 'mode:default'
+  if (t === '/mode' || t === '权限模式') return 'mode:show'
   return null
 }
 
@@ -46,7 +56,7 @@ async function handleInstant(cmd: string, text: string, msg: IncomingMessage): P
       return '已开启全新对话。'
 
     case 'help':
-      return `🤖 你的 AI 秘书\n\n发消息就行，我会立刻收下然后后台处理，完成后主动通知你。\n\n📎 发图片/文件 → 识别分析\n🔍 搜索信息 → 浏览器搜索\n📅 课程表 → 自动设提醒\n📊 图表/文档 → 生成文件\n⏰ 定时任务 → 自然语言\n\n指令:\n/tasks - 查看任务队列\n/cancel ID - 取消任务\n/new - 新对话\n/status - 状态\n/done 名称 - 打卡完成\n/remind - 提醒列表\n/help - 帮助`
+      return `🤖 你的 AI 秘书\n\n发消息就行，我会立刻收下然后后台处理，完成后主动通知你。\n\n📎 发图片/文件 → 识别分析\n🔍 搜索信息 → 浏览器搜索\n📅 课程表 → 自动设提醒\n📊 图表/文档 → 生成文件\n⏰ 定时任务 → 自然语言\n\n指令:\n/tasks - 查看任务队列\n/cancel ID - 取消任务\n/new - 新对话\n/status - 状态\n/done 名称 - 打卡完成\n/remind - 提醒列表\n/memory - 查看记忆\n/forget - 清除记忆\n/mode - 查看权限模式\n/plan - 规划模式(只读)\n/auto - 自动模式\n/strict - 严格模式\n/free - 默认模式\n/help - 帮助`
 
     case 'tasks': {
       const userTasks = getUserTasks(sk)
@@ -85,6 +95,50 @@ async function handleInstant(cmd: string, text: string, msg: IncomingMessage): P
         const out = execSync(cmd, { encoding: 'utf-8', timeout: 10000 })
         return out.trim() || '操作完成'
       } catch (e) { return '操作失败' }
+    }
+
+    case 'memory': {
+      const profileMgr = new UserProfileManager(CONFIG.claude.workDir)
+      const profile = profileMgr.load(msg.userOpenId || '')
+      if (!profile.name && profile.facts.length === 0 && profile.corrections.length === 0) {
+        return '我还没有记住关于你的任何信息。多聊几次我就会记住你的偏好和信息了！'
+      }
+      let info = '🧠 我记住的关于你的信息:\n'
+      if (profile.name) info += `称呼: ${profile.name}\n`
+      if (profile.facts.length) info += `\n已知信息:\n${profile.facts.map((f, i) => `${i + 1}. ${f}`).join('\n')}\n`
+      if (profile.corrections.length) info += `\n纠正记录:\n${profile.corrections.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n`
+      if (profile.preferences.topics?.length) info += `\n你常聊: ${profile.preferences.topics.join(', ')}`
+      return info
+    }
+
+    case 'forget': {
+      const profileMgr = new UserProfileManager(CONFIG.claude.workDir)
+      const emptyProfile = {
+        userId: msg.userOpenId || '',
+        facts: [],
+        preferences: {},
+        corrections: [],
+        lastActive: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      }
+      profileMgr.save(emptyProfile)
+      return '已清除所有关于你的记忆。'
+    }
+
+    case 'mode:show': {
+      const mode = modeManager.getMode(sk)
+      return `当前权限模式: ${mode}\n${MODE_DESCRIPTIONS[mode]}\n\n可用: /plan /strict /auto /free`
+    }
+
+    case 'mode:plan':
+    case 'mode:strict':
+    case 'mode:auto':
+    case 'mode:default': {
+      const newMode = cmd.split(':')[1] as PermissionMode
+      const check = modeManager.canSwitchTo(newMode)
+      if (!check.allowed) return `❌ ${check.reason}`
+      modeManager.setMode(sk, newMode)
+      return `✅ 已切换到 ${newMode} 模式\n${MODE_DESCRIPTIONS[newMode]}`
     }
 
     default: return ''
@@ -143,6 +197,11 @@ async function handleMessage(msg: IncomingMessage) {
   const sk = getSessionKey(msg)
   const tid = getTargetId(msg)
 
+  // 0. 拦截确认回复（早于任何命令判断）
+  if (text && confirmBridge.resolveConfirmation(msg.userOpenId || '', text.trim())) {
+    return  // 这条消息是确认回复，已处理
+  }
+
   // 1. 即时命令始终优先检查
   {
     const cmd = isInstantCommand(text)
@@ -185,9 +244,14 @@ async function handleMessage(msg: IncomingMessage) {
 
 // ==================== 启动 ====================
 
+const modelInfo = CONFIG.model.provider === 'claude_code' || CONFIG.model.provider === ('claude_code_proxy' as any)
+  ? 'Claude Code CLI'
+  : `${CONFIG.model.provider}/${CONFIG.model.name || '(未配置模型名)'}`
+
 console.log('=========================================')
-console.log('  Claude Code QQ Bot · 异步秘书模式')
-console.log(`  最大并发: ${CONFIG.queue?.maxConcurrent || 2} | 超时: 10分钟`)
+console.log('  AI Agent QQ Bot · 异步秘书模式')
+console.log(`  模型: ${modelInfo}`)
+console.log(`  最大并发: ${CONFIG.maxConcurrent} | 超时: 10分钟`)
 console.log('  你可以连续发多条消息，不会阻塞')
 console.log('=========================================')
 

@@ -1,7 +1,16 @@
-import { spawn } from 'child_process'
+import { spawn, spawnSync } from 'child_process'
 import { existsSync, writeFileSync, readFileSync, mkdirSync, openSync, closeSync } from 'fs'
 import { randomUUID } from 'crypto'
 import { CONFIG, PROJECT_ROOT } from './config.js'
+import { runAgent } from './engine/agentEngine.js'
+import type { ModelConfig } from './engine/types.js'
+import { MemoryManager } from './engine/memory/memoryManager.js'
+
+import { PermissionModeManager } from './engine/permission/permissionMode.js'
+import { UserConfirmBridge } from './engine/permission/userConfirmBridge.js'
+import { AuditLog } from './engine/permission/auditLog.js'
+import { DEFAULT_PERMISSION_CONTEXT } from './engine/permission/permissionTypes.js'
+import type { PermissionContext } from './engine/permission/permissionTypes.js'
 
 // 进度文件管理
 const PROGRESS_DIR = `${PROJECT_ROOT}/workspace/progress`
@@ -30,6 +39,32 @@ function detectOutputFiles(resp: string): string[] {
   return files
 }
 
+
+// ==================== 权限系统全局单例 ====================
+
+const modeManager = new PermissionModeManager(CONFIG.claude.workDir)
+const auditLog = new AuditLog(CONFIG.claude.workDir)
+
+/** 发送 QQ 消息的辅助函数（给 confirmBridge 用） */
+function sendQQMessage(targetId: string, text: string): void {
+  const smartSend = `${PROJECT_ROOT}/tools/send_qq_smart.cjs`
+  try {
+    spawnSync('node', [smartSend, targetId, 'c2c'], {
+      input: text,
+      timeout: 15000,
+      encoding: 'utf-8',
+      cwd: PROJECT_ROOT,
+    })
+  } catch {}
+}
+
+const confirmBridge = new UserConfirmBridge(
+  async (userId, text) => { sendQQMessage(userId, text) },
+  60000,
+)
+
+/** 导出 modeManager 和 confirmBridge 供 index.ts 使用 */
+export { modeManager, confirmBridge }
 
 // ==================== 类型 ====================
 
@@ -87,6 +122,11 @@ function getOrCreateSession(key: string): string {
 export function resetSession(key: string) {
   sessions[key] = { uuid: randomUUID(), created: new Date().toISOString() }
   saveSessions()
+  // 重置新版记忆系统（会话笔记重置，用户画像保留）
+  try {
+    const memory = new MemoryManager(key, '', CONFIG.claude.workDir, CONFIG.model.maxTokens || 8192)
+    memory.notes.reset()
+  } catch {}
 }
 
 // 启动时加载队列
@@ -202,17 +242,6 @@ function processNext() {
     writeProgress(next.id, { status: 'done', startedAt: next.startedAt, prompt: next.prompt.slice(0, 60), result: result.slice(0, 500) })
     cleanProgress(next.id)
 
-    // 会话笔记
-    try {
-      const promptSnippet = next.prompt.slice(0, 80).replace(/["\\]/g, '')
-      const resultSnippet = (next.result || '').slice(0, 100).replace(/["\\]/g, '')
-      const logEntry = `用户: ${promptSnippet} → AI: ${resultSnippet}`
-      const { spawnSync: spLog } = require('child_process')
-      spLog('node', [`${PROJECT_ROOT}/tools/session_notes.cjs`, 'append', next.sessionKey, logEntry], {
-        encoding: 'utf-8', timeout: 5000,
-      })
-    } catch {}
-
     // 推送结果（带防重复）
     safePushResult(next)
 
@@ -248,6 +277,117 @@ function processNext() {
 }
 
 async function executeTask(task: Task): Promise<string> {
+  const provider = CONFIG.model.provider
+
+  // 非 claude_code 模式 → 走 Agent Engine
+  if (provider !== 'claude_code' && provider !== ('claude_code_proxy' as any)) {
+    return executeWithAgentEngine(task)
+  }
+
+  // claude_code / claude_code_proxy 模式 → 走现有 spawn claude 逻辑
+  return executeWithClaudeCode(task)
+}
+
+/** 使用新 Agent Engine 执行任务 */
+async function executeWithAgentEngine(task: Task): Promise<string> {
+  // 创建新版三层记忆管理器
+  const memory = new MemoryManager(
+    task.sessionKey,
+    task.userId,
+    CONFIG.claude.workDir,
+    CONFIG.model.maxTokens || 8192,
+  )
+
+  // 读取系统提示词（分模型加载）
+  let systemPrompt = ''
+  try {
+    const promptDir = `${PROJECT_ROOT}/workspace/prompts`
+    const modelName = CONFIG.model.name.toLowerCase()
+    const provider = CONFIG.model.provider
+
+    // 优先级: 模型专用 > 厂商级 > 通用 > 旧版 CLAUDE.md
+    const candidates = [
+      `${promptDir}/${modelName}.md`,        // 如 deepseek-chat.md
+      `${promptDir}/${provider}.md`,         // 如 openai.md / anthropic.md
+      `${promptDir}/base.md`,               // 通用基础
+      `${PROJECT_ROOT}/workspace/CLAUDE.md`, // 旧版兼容
+    ]
+
+    for (const p of candidates) {
+      if (existsSync(p)) {
+        systemPrompt = readFileSync(p, 'utf-8')
+        console.log(`[Queue] 加载 prompt: ${p.replace(PROJECT_ROOT, '.')}`)
+        break
+      }
+    }
+
+    // DeepSeek 特殊处理: 如果用了 openai provider 且模型名包含 deepseek，优先用 deepseek.md
+    if (provider === 'openai' && modelName.includes('deepseek') && existsSync(`${promptDir}/deepseek.md`)) {
+      systemPrompt = readFileSync(`${promptDir}/deepseek.md`, 'utf-8')
+      console.log(`[Queue] 加载 prompt: ./workspace/prompts/deepseek.md (DeepSeek 专用)`)
+    }
+  } catch {
+    // 回退到旧版
+    try { systemPrompt = readFileSync(`${PROJECT_ROOT}/workspace/CLAUDE.md`, 'utf-8') } catch {}
+  }
+
+  const modelConfig: ModelConfig = {
+    provider: CONFIG.model.provider as 'anthropic' | 'openai',
+    model: CONFIG.model.name,
+    apiKey: CONFIG.model.apiKey,
+    baseUrl: CONFIG.model.baseUrl || undefined,
+    maxTokens: CONFIG.model.maxTokens,
+    temperature: CONFIG.model.temperature,
+  }
+
+  console.log(`[Queue] Agent Engine 模式: ${modelConfig.provider}/${modelConfig.model}`)
+
+  // 使用新版记忆系统：记忆上下文注入由 agentEngine 内部的 memory.buildFullContext 完成
+  // 构建权限上下文
+  const mode = modeManager.getMode(task.sessionKey)
+  const permissionContext: PermissionContext = {
+    ...DEFAULT_PERMISSION_CONTEXT,
+    mode,
+    userId: task.userId,
+    sessionKey: task.sessionKey,
+    workspaceRoot: CONFIG.claude.workDir,
+    bypassEnvFlag: process.env.BYPASS_PERMISSIONS === 'true',
+  }
+
+  const result = await runAgent(task.prompt, {
+    modelConfig,
+    systemPrompt,
+    maxTurns: 20,
+    timeoutMs: TASK_TIMEOUT,
+    workDir: CONFIG.claude.workDir,
+    toolTimeout: 60000,
+    userId: task.userId,
+    sessionKey: task.sessionKey,
+    memory,            // 传入三层记忆管理器
+    permissionContext,  // 传入权限上下文
+    confirmBridge,      // 传入二次确认桥
+    auditLog,           // 传入审计日志
+  })
+
+  // 任务完成后，异步提取用户画像（不阻塞返回）
+  const conversationSnippet = `用户: ${task.prompt.slice(0, 200)}\nAI: ${(result.content || '').slice(0, 300)}`
+  memory.profiles.extractAndMerge(
+    task.userId,
+    conversationSnippet,
+    async (p) => {
+      const { OpenAIAdapter } = await import('./adapters/openai.js')
+      const adapter = new OpenAIAdapter(modelConfig)
+      const r = await adapter.chat([{ role: 'user', content: p }], [], {})
+      return r.content
+    },
+  ).catch(() => {})  // 静默失败
+
+  console.log(`[Queue] Agent 完成: ${result.turnCount} 轮, ${result.toolCallCount} 次工具调用`)
+  return result.content || '（执行完毕）'
+}
+
+/** 使用现有 Claude Code CLI 执行任务（原有逻辑） */
+async function executeWithClaudeCode(task: Task): Promise<string> {
   const uuid = getOrCreateSession(task.sessionKey)
 
   return new Promise((resolve, reject) => {
@@ -297,7 +437,6 @@ async function executeTask(task: Task): Promise<string> {
       if (code === 0) {
         settle(resolve, stdout.trim() || '（执行完毕）')
       } else if (hasExistingSession) {
-        // resume 失败 → 用新会话重试（仅在 executeTask 内重试一次）
         console.log(`[Queue] resume失败 [${task.id}]，新会话重试`)
         resetSession(task.sessionKey)
         const newUuid = getOrCreateSession(task.sessionKey)

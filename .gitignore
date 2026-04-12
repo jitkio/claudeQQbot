@@ -39,6 +39,16 @@ workspace/hello.txt
 claude-code-main.zip
 fix_qqbot.sh
 
+# Claude Code 会话数据
+.claude/
+
+# 权限审计与用户画像
+workspace/audit/
+workspace/user_profiles/
+
+# 编译产物
+dist/
+
 # 系统
 .DS_Store
 *.swp
