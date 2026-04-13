@@ -57,7 +57,7 @@ export class ToolSelector {
     let reason = `基于关键词匹配，命中 ${selected.length} 个工具`
 
     const isSmallModel = provider === 'openai'
-    if (isSmallModel && selected.length > 5) {
+    if (isSmallModel && selected.length > 7) {
       // 按 tokenCost 升序，只保留最便宜的 5 个
       finalSelected = [...selected]
         .sort((a, b) => {
@@ -65,7 +65,7 @@ export class ToolSelector {
           const cb = this.profiles.find(p => p.tool.name === b.name)?.tokenCost ?? 999
           return ca - cb
         })
-        .slice(0, 5)
+        .slice(0, 7)
       reason = `小模型 provider ${provider}，从 ${selected.length} 个候选中保留 5 个`
     }
 
@@ -80,7 +80,7 @@ export class ToolSelector {
 /** 判断消息是否有执行意图（而非纯聊天） */
 function hasActionIntent(msg: string): boolean {
   const actionKeywords = [
-    '帮我', '帮忙', '请', '能不能', '可以', '找', '查', '看', '给我', '告诉', '找', '查', '看', '给我', '告诉',
+    '帮我', '帮忙', '请', '能不能', '可以', '找', '查', '看', '给我', '告诉', '找', '查', '看', '给我', '告诉', '找', '查', '看', '给我', '告诉',
     '搜索', '查找', '查询', '搜一下', '看看',
     '执行', '运行', '安装', '下载', '创建', '生成', '写', '编辑', '修改', '删除',
     '读取', '打开', '分析', '处理',
@@ -108,10 +108,15 @@ export function createOrchestratorSelector(tools: ToolDef[]): ToolSelector {
     { name: 'edit_file', category: 'file', keywords: ['修改', '编辑', '替换', '更新文件', '改文件', '改一下'], tokenCost: 60 },
     { name: 'glob', category: 'file', keywords: ['查找文件', '文件列表', '目录', '文件名', '找文件', '哪些文件', '列出文件'], tokenCost: 40 },
     { name: 'grep', category: 'file', keywords: ['搜索内容', '查找文本', '包含', 'grep', '搜索代码', '在文件中找'], tokenCost: 45 },
-    { name: 'web_search', category: 'web', keywords: ['搜索', '查找', '最新', '新闻', '怎么样', '价格', '天气', '百科', '是什么', '谁是', '搜一下', '查一下', '了解', '调研', '找', '热搜', '榜', '排行', '推荐', '评价', '对比', 'b站', 'bilibili', '百度', '知乎', '微博', '今天', '最近', '现在', '目前', '实时', '多少钱', '哪个', '哪里', '什么时候', '找', '热搜', '榜', '排行', '推荐', '评价', '对比', 'b站', 'bilibili', '百度', '知乎', '微博', '今天', '最近', '现在', '目前', '实时', '多少钱', '哪个', '哪里', '什么时候'], tokenCost: 60 },
+    { name: 'web_search', category: 'web', keywords: ['搜索', '查找', '最新', '新闻', '怎么样', '价格', '天气', '百科', '是什么', '谁是', '搜一下', '查一下', '了解', '调研', '找', '热搜', '榜', '排行', '推荐', '对比', 'b站', 'bilibili', '百度', '知乎', '微博', '今天', '最近', '现在', '目前', '实时', '多少钱', '哪个', '哪里', '什么时候', '找', '热搜', '榜', '排行', '推荐', '评价', '对比', 'b站', 'bilibili', '百度', '知乎', '微博', '今天', '最近', '现在', '目前', '实时', '多少钱', '哪个', '哪里', '什么时候', '找', '热搜', '榜', '排行', '推荐', '评价', '对比', 'b站', 'bilibili', '百度', '知乎', '微博', '今天', '最近', '现在', '目前', '实时', '多少钱', '哪个', '哪里', '什么时候'], tokenCost: 60 },
     { name: 'web_fetch', category: 'web', keywords: ['网页', '链接', 'url', '抓取', '网站', '打开网页', '访问'], tokenCost: 55 },
     { name: 'web_extract', category: 'web', keywords: ['网页', '页面', '链接', '内容', '帮我看看', '提取', '抓取', '分析网页', '分析页面'], tokenCost: 60 },
     { name: 'python', category: 'code', keywords: ['python', '计算', '数据分析', '画图', '图表', 'matplotlib', '数学', '统计', 'pandas', 'numpy', '爬虫'], tokenCost: 70 },
+    { name: 'todo_write', category: 'always', keywords: [], tokenCost: 40 },
+    { name: 'enter_plan_mode', category: 'system', keywords: ['规划', '方案', '设计', '怎么做', '计划', '步骤'], tokenCost: 30 },
+    { name: 'exit_plan_mode', category: 'system', keywords: [], tokenCost: 20 },
+    { name: 'verify_task', category: 'system', keywords: [], tokenCost: 30 },
+    { name: 'browser_action', category: 'web', keywords: ['点击', '登录', '填写', '表单', '按钮', '输入框', '滚动', '翻页', '截图', '动态', '交互', '操作', '浏览器', '知乎文章', '打开页面', '模拟', '打开'], tokenCost: 50 },
     { name: 'sub_agent', category: 'system', keywords: ['调研', '分析', '对比', '总结', '深入研究', '详细调查', '全面了解', '复杂'], tokenCost: 100 },
   ]
 

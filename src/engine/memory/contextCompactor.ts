@@ -90,7 +90,7 @@ export class ContextCompactor {
     const toCompress = messages.slice(0, messages.length - keepCount)
     const toKeep = messages.slice(messages.length - keepCount)
 
-    if (toCompress.length === 0) return messages
+    if (toCompress.length === 0) return [...messages]
 
     // 构造待压缩的对话文本
     const conversationText = toCompress

@@ -35,10 +35,6 @@ QQ 是纯文本，不支持 Markdown：
 - web_search: query（字符串）, numResults（数字，可选）
 - web_fetch: url（字符串）
 - web_extract: url（字符串）, goal（字符串，可选）
-- browser_action: 操控浏览器。参数 action（goto/click/type/scroll_down/scroll_up/screenshot/extract/wait）, url, index, text, goal
-  - 适合需要登录、点击、填表、处理动态加载页面的场景
-  - 每次操作后返回可交互元素列表，用索引号指定操作目标
-  - 简单抓取用 web_fetch，复杂交互才用 browser_action
 
 ## 搜索策略
 - 用户要搜信息时，直接调用 web_search

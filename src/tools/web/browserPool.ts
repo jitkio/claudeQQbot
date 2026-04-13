@@ -65,12 +65,28 @@ export class BrowserPool {
     let context = browser.contexts()[0]
     if (!context) {
       context = await browser.newContext({
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
         locale: 'zh-CN',
+        viewport: { width: 1920, height: 1080 },
+        deviceScaleFactor: 1,
+        hasTouch: false,
+        javaScriptEnabled: true,
+        bypassCSP: true,
       })
     }
 
     const page = await context.newPage()
+    // 反 webdriver 检测
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => false })
+      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] })
+      Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN', 'zh', 'en'] })
+      const originalQuery = window.navigator.permissions.query
+      window.navigator.permissions.query = (parameters) =>
+        parameters.name === 'notifications'
+          ? Promise.resolve({ state: Notification.permission } as PermissionStatus)
+          : originalQuery(parameters)
+    }).catch(() => {})
     this.pageCount++
     return page
   }
@@ -88,7 +104,7 @@ export class BrowserPool {
     console.log('[BrowserPool] 启动 Chromium...')
     return chromium.launch({
       headless: true,
-      executablePath: process.env.CHROMIUM_PATH || undefined,
+            executablePath: process.env.CHROMIUM_PATH || undefined,
       args: [
         '--no-sandbox',
         '--disable-gpu',

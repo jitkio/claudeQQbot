@@ -131,12 +131,20 @@ export class ContentFetcher {
       .replace(/<header[\s\S]*?<\/header>/gi, '')
       .replace(/<aside[\s\S]*?<\/aside>/gi, '')
 
-    // 移除所有 HTML 标签
-    cleaned = cleaned.replace(/<[^>]+>/g, ' ')
+    // 转为 markdown（保留结构信息）
+    cleaned = cleaned.replace(/<h1[^>]*>([\s\S]*?)<\/h1>/gi, '\n# $1\n')
+    cleaned = cleaned.replace(/<h2[^>]*>([\s\S]*?)<\/h2>/gi, '\n## $1\n')
+    cleaned = cleaned.replace(/<h3[^>]*>([\s\S]*?)<\/h3>/gi, '\n### $1\n')
+    cleaned = cleaned.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, '- $1\n')
+    cleaned = cleaned.replace(/<a[^>]+href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, '[$2]($1)')
+    cleaned = cleaned.replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, '$1\n\n')
+    cleaned = cleaned.replace(/<br\s*\/?>/gi, '\n')
+    // 移除剩余 HTML 标签
+    cleaned = cleaned.replace(/<[^>]+>/g, '')
     // 解码 HTML 实体
     cleaned = cleaned.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
     // 清理空白
-    cleaned = cleaned.replace(/\s+/g, ' ').trim()
+    cleaned = cleaned.replace(/\n{3,}/g, '\n\n').replace(/ {2,}/g, ' ').trim()
 
     return {
       url, title,

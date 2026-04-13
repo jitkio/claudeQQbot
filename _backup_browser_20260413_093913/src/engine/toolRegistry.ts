@@ -10,7 +10,6 @@ import { webFetchTool } from '../tools/web/webFetch.js'
 import { contentExtractTool } from '../tools/web/contentExtractor.js'
 import { pythonReplTool } from '../tools/pythonRepl.js'
 import { subAgentTool } from '../tools/subAgent.js'
-import { browserActionTool } from '../tools/web/browserAction.js'
 
 // 规划系统工具
 import { todoWriteTool } from '../tools/todoWrite.js'
@@ -85,7 +84,6 @@ export function createDefaultRegistry(planningDeps?: PlanningDeps): ToolRegistry
   registry.register(contentExtractTool)
   registry.register(pythonReplTool)
   registry.register(subAgentTool)
-  registry.register(browserActionTool)
 
   // 规划系统工具（需要外部依赖才能注册）
   if (planningDeps) {

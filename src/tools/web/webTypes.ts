@@ -45,3 +45,39 @@ export interface SearchOptions {
   lang?: string
   country?: string
 }
+
+
+/** 页面可交互元素 */
+export interface InteractiveElement {
+  index: number
+  tag: string
+  text: string
+  type?: string
+  href?: string
+  role?: string
+}
+
+/** 页面状态快照 */
+export interface PageSnapshot {
+  url: string
+  title: string
+  elements: InteractiveElement[]
+  scrollPosition: {
+    pixelsAbove: number
+    pixelsBelow: number
+    totalHeight: number
+    viewportHeight: number
+  }
+  screenshot?: string
+}
+
+/** 浏览器动作类型 */
+export type BrowserAction =
+  | 'goto'
+  | 'click'
+  | 'type'
+  | 'scroll_down'
+  | 'scroll_up'
+  | 'screenshot'
+  | 'extract'
+  | 'wait'
