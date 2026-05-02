@@ -18,6 +18,7 @@ export interface Message {
   toolCalls?: ToolCall[]      // assistant 消息中的工具调用
   toolCallId?: string         // tool 消息对应的调用 ID
   name?: string               // tool 消息的工具名
+  reasoningContent?: string   // DeepSeek V4 思考模式的推理内容（回传用，不展示）
 }
 
 // 工具调用
@@ -75,6 +76,7 @@ export interface ModelResponse {
   toolCalls: ToolCall[]
   usage?: { input: number; output: number }
   finishReason: 'stop' | 'tool_use' | 'length' | 'error'
+  reasoningContent?: string   // DeepSeek V4 思考模式返回的推理链，需要回传给 API
 }
 
 // 模型配置

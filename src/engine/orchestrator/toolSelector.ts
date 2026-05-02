@@ -102,7 +102,7 @@ export function createOrchestratorSelector(tools: ToolDef[]): ToolSelector {
     keywords: string[]
     tokenCost: number
   }> = [
-    { name: 'bash', category: 'always', keywords: ['执行', '运行', '命令', '安装', '下载', 'python', 'pip', 'npm', 'apt', '代码', '脚本', '编译', '部署', '启动', '停止', '重启', '服务'], tokenCost: 80 },
+    { name: 'bash', category: 'always', keywords: [], tokenCost: 80 },
     { name: 'read_file', category: 'file', keywords: ['文件', '读取', '看看', '打开', '图片', '分析', '文档', '内容', '配置', '日志', 'log', '读', '查看'], tokenCost: 50 },
     { name: 'write_file', category: 'file', keywords: ['写入', '创建文件', '保存', '生成文件', '导出', '写文件', '新建'], tokenCost: 50 },
     { name: 'edit_file', category: 'file', keywords: ['修改', '编辑', '替换', '更新文件', '改文件', '改一下'], tokenCost: 60 },
@@ -118,6 +118,15 @@ export function createOrchestratorSelector(tools: ToolDef[]): ToolSelector {
     { name: 'verify_task', category: 'system', keywords: [], tokenCost: 30 },
     { name: 'browser_action', category: 'web', keywords: ['点击', '登录', '填写', '表单', '按钮', '输入框', '滚动', '翻页', '截图', '动态', '交互', '操作', '浏览器', '知乎文章', '打开页面', '模拟', '打开'], tokenCost: 50 },
     { name: 'sub_agent', category: 'system', keywords: ['调研', '分析', '对比', '总结', '深入研究', '详细调查', '全面了解', '复杂'], tokenCost: 100 },
+
+    // ===== 提醒系统工具 (Phase 2) =====
+    // 一组共享关键词：任何"提醒/任务/打卡/截止"诉求都触发这一组
+    { name: 'reminder_create',   category: 'schedule', keywords: ['提醒', '任务', '待办', '记一下', '记下', '别忘', '叫我', '叫醒', '截止', '到期', 'deadline', '每天', '每周', '每月', '每日', '明天', '后天', '下周', '今天', '稍后', '过会儿', '过会', '一会', '一会儿', '会儿', '点开', '点提醒', '打卡', '锻炼', '复习', '记得', '安排', '日程', '约定', '约', '会议', '开会', '吃药', '喝水', 'todo', '设置', '建立', '新建', '创建', '加个', '加一个'], tokenCost: 50 },
+    { name: 'reminder_list',     category: 'always', keywords: ['列出', '查看', '看下', '看一下', '我的任务', '我的待办', '任务清单', '提醒列表', '有什么', '剩下', '有哪些', '我有', '还有', '所有任务', '今天的任务', '本周', '本月', '近期', '最近', '都有'], tokenCost: 50 },
+    { name: 'reminder_complete', category: 'schedule', keywords: ['完成了', '做完了', '搞定了', '弄完了', '已完成', '搞定', '完成', '打卡', '已经', '解决了'], tokenCost: 40 },
+    { name: 'reminder_snooze',   category: 'schedule', keywords: ['推迟', '晚点', '稍后再', '过会再', '过会儿再', '改时间', '改成', '改到', '挪到', 'snooze', '一会儿再', '等会再'], tokenCost: 40 },
+    { name: 'reminder_cancel',   category: 'schedule', keywords: ['取消', '不做了', '不用了', '删除任务', '删了那个', '删除', '不要了', '撤销', 'cancel'], tokenCost: 40 },
+    { name: 'reminder_update',   category: 'schedule', keywords: ['修改', '改一下', '改成', '改到', '改名', '调整', '变更', 'update'], tokenCost: 40 },
   ]
 
   for (const d of defaults) {

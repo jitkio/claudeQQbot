@@ -18,6 +18,10 @@ import { AuditLog } from './engine/permission/auditLog.js'
 import { DEFAULT_PERMISSION_CONTEXT } from './engine/permission/permissionTypes.js'
 import type { PermissionContext } from './engine/permission/permissionTypes.js'
 
+// ESM 兼容：允许在 ESM 环境下使用 require
+import { createRequire as __createRequire } from 'module'
+const __esmRequire = __createRequire(import.meta.url)
+
 
 
 
@@ -25,27 +29,67 @@ import type { PermissionContext } from './engine/permission/permissionTypes.js'
 const PROGRESS_DIR = `${PROJECT_ROOT}/workspace/progress`
 function writeProgress(taskId: string, data: any) {
   try {
-    const { mkdirSync, writeFileSync } = require('fs')
+    const { mkdirSync, writeFileSync } = __esmRequire('fs')
     mkdirSync(PROGRESS_DIR, { recursive: true })
     writeFileSync(PROGRESS_DIR + '/' + taskId + '.json', JSON.stringify(data))
   } catch {}
 }
 function cleanProgress(taskId: string) {
   setTimeout(() => {
-    try { require('fs').unlinkSync(PROGRESS_DIR + '/' + taskId + '.json') } catch {}
+    try { __esmRequire('fs').unlinkSync(PROGRESS_DIR + '/' + taskId + '.json') } catch {}
   }, 300000)
 }
 
 
-// 从 Claude 回复中检测生成的文件路径
-function detectOutputFiles(resp: string): string[] {
-  const files: string[] = []
-  const re = new RegExp(`${PROJECT_ROOT.replace(/[\\/]/g, "\\\\")}\\/workspace\\/(?:output|uploads)\\/\\S+\\.\\w+`, "g")
-  for (const m of resp.match(re) || []) {
-    const c = m.replace(/[。，、；：）\]）}'"]+$/, '')
-    if (existsSync(c) && !files.includes(c)) files.push(c)
+const SENDABLE_EXT = /\.(txt|md|pdf|docx?|xlsx?|pptx?|csv|json|zip|tar\.gz|tgz|7z|rar|png|jpg|jpeg|gif|webp|bmp|mp3|wav|m4a|flac|ogg|silk|amr|mp4|mov|mkv|webm|py|js|ts|sh|html?|log|yml|yaml)$/i
+
+function detectOutputFiles(resp: string, opts?: { since?: number; until?: number }): string[] {
+  const { resolve: resolvePath, isAbsolute, join } = __esmRequire('path')
+  const { readdirSync, statSync } = __esmRequire('fs')
+
+  const out: string[] = []
+  const add = (raw: string) => {
+    if (!raw) return
+    let p = raw.replace(/[。，、；：）\]）}'"`\s]+$/g, '').trim()
+    if (!p) return
+    const abs = isAbsolute(p) ? p : resolvePath(PROJECT_ROOT, p)
+    if (!existsSync(abs)) return
+    if (!SENDABLE_EXT.test(abs)) return
+    if (!out.includes(abs)) out.push(abs)
   }
-  return files
+
+  const reAbs = /\/[^\s。，、；：）\]）}'"`]+\.[A-Za-z0-9]{1,8}/g
+  for (const m of resp.match(reAbs) || []) add(m)
+
+  const reRel = /(?:\.\/)?(?:workspace\/)?(?:output|uploads)\/[^\s。，、；：）\]）}'"`]+\.[A-Za-z0-9]{1,8}/g
+  for (const m of resp.match(reRel) || []) add(m)
+
+  if (out.length === 0 && opts?.since) {
+    const until = opts.until ?? Date.now()
+    const dirs = [
+      join(PROJECT_ROOT, 'workspace/output'),
+      join(PROJECT_ROOT, 'workspace/uploads'),
+    ]
+    for (const dir of dirs) {
+      if (!existsSync(dir)) continue
+      const walk = (d: string) => {
+        let entries: string[] = []
+        try { entries = readdirSync(d) } catch { return }
+        for (const name of entries) {
+          const full = join(d, name)
+          let st
+          try { st = statSync(full) } catch { continue }
+          if (st.isDirectory()) { walk(full); continue }
+          if (st.mtimeMs >= opts.since! && st.mtimeMs <= until + 5000) {
+            if (SENDABLE_EXT.test(name)) add(full)
+          }
+        }
+      }
+      walk(dir)
+    }
+  }
+
+  return out
 }
 
 
@@ -540,7 +584,7 @@ async function executeWithClaudeCode(task: Task): Promise<string> {
     // 读取会话笔记
     let enrichedPrompt = task.prompt
     try {
-      const { spawnSync: spNotes } = require('child_process')
+      const { spawnSync: spNotes } = __esmRequire('child_process')
       const nr = spNotes('node', [`${PROJECT_ROOT}/tools/session_notes.cjs`, 'read', task.sessionKey], {
         encoding: 'utf-8', timeout: 5000,
       })
@@ -615,7 +659,7 @@ function safePushResult(task: Task) {
 }
 
 function pushResult(task: Task) {
-  const { spawnSync } = require('child_process')
+  const { spawnSync } = __esmRequire('child_process')
   const smartSend = `${PROJECT_ROOT}/tools/send_qq_smart.cjs`
 
   let content: string
@@ -633,7 +677,7 @@ function pushResult(task: Task) {
 
   // Markdown → 纯文本
   try {
-    const { spawnSync: sp } = require('child_process')
+    const { spawnSync: sp } = __esmRequire('child_process')
     const r = sp('node', [`${PROJECT_ROOT}/tools/strip_markdown.cjs`], {
       input: content, encoding: 'utf-8', timeout: 5000,
     })
@@ -660,9 +704,12 @@ function pushResult(task: Task) {
 
   // 检测文件并发送
   if (task.status === 'done' && task.result && task.targetId) {
-    const outputFiles = detectOutputFiles(task.result)
+    const outputFiles = detectOutputFiles(task.result, {
+      since: task.startedAt,
+      until: task.completedAt,
+    })
     if (outputFiles.length > 0) {
-      const { spawnSync: spFile } = require('child_process')
+      const { spawnSync: spFile } = __esmRequire('child_process')
       const sendFileTool = `${PROJECT_ROOT}/tools/send_qq_file.cjs`
       for (const fp of outputFiles) {
         try {
@@ -698,7 +745,7 @@ setInterval(() => {
 
 setInterval(() => {
   try {
-    const { execSync } = require('child_process')
+    const { execSync } = __esmRequire('child_process')
     execSync(`node ${PROJECT_ROOT}/tools/cleanup_session_notes.cjs`, { encoding: 'utf-8', timeout: 10000 })
   } catch {}
 }, 86400000)

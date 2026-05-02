@@ -52,3 +52,36 @@ workspace/audit.jsonl
 workspace/usage.jsonl
 workspace/workspace/
 workspace/mcp_servers.json
+
+# ===== 智能提醒系统 =====
+data/reminder/
+!data/reminder/README.md
+.reminder_setup_tmp/
+_preinstall_backup_*/
+_patch_backup_*/
+
+# ===== 补充: 用户数据 =====
+workspace/todos/
+
+# ===== 补充: 本地备份 =====
+_backup_*/
+*.backup.*
+*.tar.gz
+*.zip
+
+# ===== 补充: 开发期一次性脚本 =====
+step*.sh
+patch_*.sh
+fix_*.sh
+phase*.sh
+cleanup.sh
+switch_*.sh
+upgrade_*.sh
+
+# ===== 补充: 编辑器 =====
+.vscode/
+.idea/
+
+# ===== 补充: 文件服务器 token / 权限状态 =====
+workspace/file_tokens.json
+workspace/permission_modes/

@@ -29,6 +29,7 @@ import { taskListTool } from '../tools/taskList.js'
 import { taskUpdateTool } from '../tools/taskUpdate.js'
 import { taskStopTool } from '../tools/taskStop.js'
 import { taskOutputTool } from '../tools/taskOutput.js'
+import { reminderTools } from '../tools/reminderTools.js'
 import type { TaskManager } from './tasks/taskManager.js'
 
 // MCP（可选）
@@ -143,6 +144,9 @@ export function createDefaultRegistry(
   registry.register(pythonReplTool)
   registry.register(subAgentTool)
   registry.register(browserActionTool)
+
+  // 提醒系统工具 (Phase 2)
+  for (const t of reminderTools) registry.register(t)
 
   // 规划系统工具（需要外部依赖才能注册）
   if (planningDeps) {

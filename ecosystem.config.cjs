@@ -2,7 +2,8 @@ module.exports = {
   apps: [{
     name: 'qqbot',
     script: 'src/index.ts',
-    interpreter: '/usr/local/bin/bun',
+    interpreter: 'node',
+    interpreter_args: '--import tsx/esm',
     cwd: '/home/ubuntu/Magent/claudeqqbot',
     max_restarts: 20,
     restart_delay: 5000,
@@ -21,5 +22,27 @@ module.exports = {
     error_file: '/home/ubuntu/Magent/claudeqqbot/logs/progress-error.log',
     out_file: '/home/ubuntu/Magent/claudeqqbot/logs/progress-out.log',
     merge_logs: true,
-  }]
+  }
+,
+    {
+      name: 'reminder-worker',
+      script: 'src/reminder/worker/main.cjs',
+      interpreter: 'node',
+      cwd: __dirname,
+      exec_mode: 'fork',
+      instances: 1,
+      autorestart: true,
+      max_restarts: 20,
+      min_uptime: '10s',
+      watch: false,
+      max_memory_restart: '200M',
+      env: {
+        NODE_ENV: 'production',
+      },
+      error_file: './logs/reminder-worker-error.log',
+      out_file: './logs/reminder-worker-out.log',
+      merge_logs: true,
+      time: true,
+    },
+]
 }

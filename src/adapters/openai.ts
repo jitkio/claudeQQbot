@@ -176,6 +176,8 @@ export class OpenAIAdapter extends ModelAdapter {
           }))
           if (!entry.content) entry.content = null
         }
+        // DeepSeek V4 思考模式：reasoning_content 必须在下一轮回传，否则 API 报 400
+        if (msg.reasoningContent) entry.reasoning_content = msg.reasoningContent
         result.push(entry)
       } else if (msg.role === 'tool') {
         result.push({ role: 'tool', tool_call_id: msg.toolCallId, content: msg.content })
@@ -216,11 +218,18 @@ export class OpenAIAdapter extends ModelAdapter {
     if (choice.finish_reason === 'tool_calls' || toolCalls.length > 0) finishReason = 'tool_use'
     else if (choice.finish_reason === 'length') finishReason = 'length'
 
+    // DeepSeek V4 思考模式：提取 reasoning_content（不展示给用户，仅回传）
+    const reasoningContent = message.reasoning_content || undefined
+    if (reasoningContent) {
+      console.log(`[OpenAI] 收到思考内容 ${reasoningContent.length} 字符（不展示，仅回传）`)
+    }
+
     return {
       content: message.content || '',
       toolCalls,
       usage: raw.usage ? { input: raw.usage.prompt_tokens || 0, output: raw.usage.completion_tokens || 0 } : undefined,
       finishReason,
+      reasoningContent,
     }
   }
 
@@ -295,6 +304,7 @@ export class OpenAIAdapter extends ModelAdapter {
 
     // 读取 SSE 流
     let fullContent = ''
+    let fullReasoning = ''   // DeepSeek V4 思考模式的推理内容
     const toolCallsMap = new Map<number, { id: string; name: string; arguments: string }>()
     let finishReason = 'stop'
     let usage: { input: number; output: number } | undefined
@@ -328,6 +338,11 @@ export class OpenAIAdapter extends ModelAdapter {
             if (delta?.content) {
               fullContent += delta.content
               onChunk(delta.content)
+            }
+
+            // DeepSeek V4 思考模式：收集 reasoning_content（不推送给 QQ 用户）
+            if (delta?.reasoning_content) {
+              fullReasoning += delta.reasoning_content
             }
 
             // 收集 tool_calls delta
@@ -376,7 +391,14 @@ export class OpenAIAdapter extends ModelAdapter {
       finishReason === 'length' ? 'length' : 'stop'
 
     if (usage) console.log(`[OpenAI] 流式完成: ${resultFinishReason}, tokens: ${usage.input}+${usage.output}`)
+    if (fullReasoning) console.log(`[OpenAI] 流式收到思考内容 ${fullReasoning.length} 字符（不展示，仅回传）`)
 
-    return { content: fullContent, toolCalls, usage, finishReason: resultFinishReason }
+    return {
+      content: fullContent,
+      toolCalls,
+      usage,
+      finishReason: resultFinishReason,
+      reasoningContent: fullReasoning || undefined,
+    }
   }
 }

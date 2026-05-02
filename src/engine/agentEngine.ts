@@ -230,6 +230,7 @@ export async function runAgent(
         role: 'assistant',
         content: response.content,
         toolCalls: response.toolCalls.length > 0 ? response.toolCalls : undefined,
+        reasoningContent: response.reasoningContent,  // 思考模式下一轮要回传
       })
 
       // 如果没有工具调用，返回最终结果

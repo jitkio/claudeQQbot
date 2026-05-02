@@ -123,13 +123,18 @@ function tokenize(cmd: string): string[] {
   return tokens
 }
 
+/** 判断是否为 /dev 下的特殊设备文件（/dev/null 等），重定向到它们是纯丢弃/转发操作，不算写入用户文件 */
+function isSpecialDevice(path: string): boolean {
+  return /^\/dev\/(null|stdout|stderr|tty|zero|random|urandom|full)$/.test(path)
+}
+
 /** 提取重定向目标（> file, >> file, 2> file 等） */
 function extractRedirections(raw: string): { hasRedirect: boolean; targets: string[] } {
   const targets: string[] = []
   const re = /(?:^|\s)(?:\d*>{1,2}|<)\s*(\S+)/g
   let match: RegExpExecArray | null
   while ((match = re.exec(raw)) !== null) {
-    if (match[1] && match[1] !== '&1' && match[1] !== '&2') {
+    if (match[1] && match[1] !== '&1' && match[1] !== '&2' && !isSpecialDevice(match[1])) {
       targets.push(match[1])
     }
   }

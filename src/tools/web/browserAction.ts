@@ -80,6 +80,7 @@ export const browserActionTool: ToolDef = {
           for (const [re, fn] of mobileRules) {
             const m = url.match(re)
             if (m) { url = fn(m); console.log('[BrowserAction] 自动转手机版:', url); break }
+          }
           await page.waitForTimeout(3500)
           // 自动关闭弹窗
           await page.evaluate(() => {

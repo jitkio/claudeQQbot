@@ -78,7 +78,7 @@ async function handleInstant(cmd: string, text: string, msg: IncomingMessage): P
 
     case 'remind': {
       try {
-        const { execSync } = require('child_process')
+        const { execSync } = _reminderRequire('child_process')
         const out = execSync(`node ${PROJECT_ROOT}/tools/reminder_manager.cjs list`, { encoding: 'utf-8', timeout: 10000 })
         return out.trim() || '当前没有提醒任务'
       } catch { return '查询失败' }
@@ -86,7 +86,7 @@ async function handleInstant(cmd: string, text: string, msg: IncomingMessage): P
 
     case 'done': {
       try {
-        const { execSync } = require('child_process')
+        const { execSync } = _reminderRequire('child_process')
         const target = text.replace(/^\/done\s*/i, '').replace(/^完成\s*/, '').trim()
         if (!target) return '用法: /done 任务名 或 /done 任务ID'
         const uid = msg.userOpenId || ''
@@ -172,6 +172,20 @@ function buildPrompt(text: string, filePaths: string[]): string {
 
 import { TimedSet } from './engine/utils/timedSet.js'
 
+// --- 提醒系统集成 ---
+import { sendC2CMessage as _reminderSendFn } from './qq.js'
+import { createRequire as _reminderCreateRequire } from 'module'
+const _reminderRequire = _reminderCreateRequire(import.meta.url)
+const reminderBridge = _reminderRequire('./reminder/integration/bootstrap.cjs') as {
+  startHttpServer: () => void
+  stopHttpServer: () => void
+  setSender: (fn: (uid: string, content: string) => Promise<any>) => void
+  isReminderCommand: (text: string) => boolean
+  handleCommand: (text: string, ownerOpenId: string) => Promise<string | null>
+}
+// --- /提醒系统集成 ---
+
+
 // ==================== 消息去重 ====================
 
 const recentMsgIds = new TimedSet()
@@ -207,6 +221,21 @@ async function handleMessage(msg: IncomingMessage) {
   // 0. 拦截确认回复（早于任何命令判断）
   if (text && confirmBridge.resolveConfirmation(msg.userOpenId || '', text.trim())) {
     return  // 这条消息是确认回复，已处理
+  }
+
+  // 0.5. 提醒系统命令（/remind /done 等）优先处理
+  if (text && reminderBridge.isReminderCommand(text)) {
+    const ownerId = msg.userOpenId || msg.senderOpenId || ''
+    if (ownerId) {
+      try {
+        const reply = await reminderBridge.handleCommand(text, ownerId)
+        if (reply) { await replyMessage(msg, reply); return }
+      } catch (e: any) {
+        console.error('[提醒] 命令处理失败:', e?.message)
+        await replyMessage(msg, `❌ 提醒系统错误: ${e?.message}`)
+        return
+      }
+    }
   }
 
   // 1. 即时命令始终优先检查
@@ -264,7 +293,7 @@ console.log('=========================================')
 
 // 启动时清理残留的 claude 子进程
 try {
-  const { execSync } = require('child_process')
+  const { execSync } = _reminderRequire('child_process')
   const pids = execSync('pgrep -f "claude -p" 2>/dev/null || true', { encoding: 'utf-8' }).trim()
   if (pids) {
     const count = pids.split('\n').length
@@ -272,6 +301,15 @@ try {
     console.log(`[启动] 清理了 ${count} 个残留 claude 进程`)
   }
 } catch {}
+
+// 启动提醒系统 HTTP server 并注入 QQ 发送函数
+try {
+  reminderBridge.startHttpServer()
+  reminderBridge.setSender(_reminderSendFn)
+  console.log('[启动] 提醒系统 HTTP 端口已开放')
+} catch (e: any) {
+  console.error('[启动] 提醒系统 HTTP 启动失败（非致命）:', e?.message)
+}
 
 startBot(handleMessage).catch(e => { console.error('启动失败:', e); process.exit(1) })
 process.on('SIGINT', () => process.exit(0))
