@@ -1,7 +1,6 @@
 /**
  * 后台任务系统的类型定义
  *
- * 设计参考: Claude Code 的 TaskCreate/Get/Update/Stop/List/Output 工具
  * 但简化了很多——我们只需要支持 bot 在 QQ 场景下的长任务代理
  */
 

@@ -4,7 +4,6 @@ import type { PathCheckResult, PermissionContext } from './permissionTypes.js'
 
 /**
  * 危险删除路径黑名单
- * 参照 $CC/utils/permissions/pathValidation.ts 第 331-367 行 isDangerousRemovalPath
  */
 export function isDangerousPath(path: string): boolean {
   const normalized = path.replace(/\\+/g, '/').replace(/\/+/g, '/')
@@ -100,7 +99,6 @@ export function checkWritePath(
 /**
  * 从命令参数中提取所有可能的路径（启发式）
  *
- * 参照 $CC/tools/BashTool/pathValidation.ts 的 PATH_EXTRACTORS 思路，
  * 但实现简化为：所有非 flag 的参数都当作候选路径
  */
 export function extractPathArgs(args: string[]): string[] {

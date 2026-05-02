@@ -1,13 +1,10 @@
 /**
  * Agent 自规划系统 - 类型定义
  *
- * 参照 Claude Code 的 TodoWriteTool 设计，定义所有规划相关的类型。
- * 参考: $CC/utils/todo/types.ts
  */
 
 /**
  * 单个待办项
- * 严格参照 $CC/utils/todo/types.ts 第 8-14 行 TodoItemSchema
  */
 export interface TodoItem {
   /** 祈使句描述："搜索 X 的资料" */
@@ -32,7 +29,6 @@ export interface TodoWriteResult {
 
 /**
  * Reminder 配置 —— 控制何时往对话里塞当前 todo 列表
- * 参照 $CC/utils/attachments.ts 第 254-258 行 TODO_REMINDER_CONFIG
  */
 export interface TodoReminderConfig {
   /** 距上次 TodoWrite 调用至少多少轮才允许触发提醒 */

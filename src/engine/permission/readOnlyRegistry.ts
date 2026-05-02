@@ -23,7 +23,6 @@ const ALWAYS_READONLY = new Set<string>([
 
 /**
  * 需要 flag 校验的只读命令
- * 参照 $CC/tools/BashTool/readOnlyValidation.ts 的 validateFlags 模式
  */
 const FLAG_CHECKED_READONLY = new Map<string, FlagRule>([
   // git —— 只读子命令白名单
@@ -75,7 +74,6 @@ export interface FlagRule {
 /**
  * 判定一个子命令是否只读
  *
- * 参照 $CC/tools/BashTool/readOnlyValidation.ts 第 1246 行 isCommandSafeViaFlagParsing
  */
 export function isReadOnlyCommand(baseCommand: string, args: string[]): boolean {
   if (ALWAYS_READONLY.has(baseCommand)) return true

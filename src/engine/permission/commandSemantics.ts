@@ -11,7 +11,6 @@ const DEFAULT_SEMANTIC: SemanticFn = (exitCode) => ({
   note: exitCode !== 0 ? `Command failed with exit code ${exitCode}` : undefined,
 })
 
-/** 参照 $CC/tools/BashTool/commandSemantics.ts 第 31-89 行的 COMMAND_SEMANTICS Map */
 const COMMAND_SEMANTICS = new Map<string, SemanticFn>([
   ['grep', (code) => ({ isError: code >= 2, note: code === 1 ? '未找到匹配' : undefined })],
   ['rg', (code) => ({ isError: code >= 2, note: code === 1 ? '未找到匹配' : undefined })],
@@ -27,7 +26,6 @@ const COMMAND_SEMANTICS = new Map<string, SemanticFn>([
 /**
  * 根据命令名解释 exit code
  *
- * 参照 $CC/tools/BashTool/commandSemantics.ts 第 124-140 行 interpretCommandResult
  */
 export function interpretExitCode(
   baseCommand: string,

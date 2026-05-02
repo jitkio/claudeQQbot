@@ -1,4 +1,4 @@
-# 记忆整理技能（源自 Claude Code /remember skill）
+# 记忆整理技能
 
 触发方式: 用户说"整理记忆"、"检查记忆"、"review memory"
 

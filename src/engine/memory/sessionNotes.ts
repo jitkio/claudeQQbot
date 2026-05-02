@@ -1,7 +1,6 @@
 /**
  * 会话笔记管理器
  *
- * 参考: Claude Code 的 SessionMemory/sessionMemory.ts
  *
  * 核心机制：
  * 1. 结构化模板：9 个固定 section 的 markdown（定义见 prompts.ts）
@@ -71,7 +70,6 @@ export class SessionNotesManager {
 
   /**
    * 判断是否应该触发笔记更新
-   * 参照 $CC/services/SessionMemory/sessionMemory.ts 第 115-170 行
    */
   shouldUpdate(currentTokenCount: number, hasToolCallsInLastTurn: boolean): boolean {
     if (this.isExtracting) return false
@@ -90,7 +88,6 @@ export class SessionNotesManager {
     const hasMetToolCallThreshold =
       this.toolCallsSinceLastUpdate >= this.config.toolCallsBetweenUpdates
 
-    // 触发条件（与 Claude Code 相同的逻辑）：
     // 1. token 阈值 AND 工具调用阈值都满足
     // 2. 或者：token 阈值满足 AND 最新一轮没有工具调用（自然间歇点）
     return (hasMetTokenThreshold && hasMetToolCallThreshold) ||
@@ -105,7 +102,6 @@ export class SessionNotesManager {
   /**
    * 执行笔记更新
    *
-   * 在 QQ bot 中没有 Claude Code 那样的 forked subagent 机制，
    * 所以改为：构造一个独立的 API 调用来更新笔记。
    *
    * @param generateFn - 用于生成笔记的函数（调用模型 API）
