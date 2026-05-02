@@ -5,7 +5,6 @@ import type { UserConfirmBridge } from '../engine/permission/userConfirmBridge.j
 /**
  * ExitPlanMode 工具 —— 提交方案，请求用户审批
  *
- * 参考: $CC/tools/ExitPlanModeTool/ExitPlanModeV2Tool.ts 第 77-145 行 schema + 第 243+ 行 call
  */
 export function exitPlanModeTool(
   modeManager: PermissionModeManager,

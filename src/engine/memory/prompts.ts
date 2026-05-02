@@ -1,7 +1,6 @@
 /**
  * 记忆系统 prompt 模板
  *
- * 参考: Claude Code 的 SessionMemory/prompts.ts 和 compact/prompt.ts
  *
  * 9 个固定 section：
  *   1. 会话标题      — 只在首次创建时写入

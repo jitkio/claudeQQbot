@@ -1,6 +1,5 @@
 /**
  * 单个批次内最多同时跑多少个并发工具
- * 参照 $CC/services/tools/toolOrchestration.ts 第 8-12 行：
  *   默认 10，环境变量 CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY 可覆盖
  *
  * QQ Bot 场景：web_search 会受搜索 API 限流影响，适合降低到 5

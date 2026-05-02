@@ -7,7 +7,6 @@ import type { TodoReminderTracker } from '../engine/planning/todoReminder.js'
 /**
  * TodoWrite 工具的使用规则 prompt
  *
- * 改编自 $CC/tools/TodoWriteTool/prompt.ts 第 3-180 行
  * 缩减到适合 QQ Bot 场景
  */
 export const TODO_WRITE_PROMPT = `用这个工具维护当前对话的待办清单。让你能跟踪进度、组织复杂任务、并向用户证明你认真对待了请求。

@@ -1,7 +1,6 @@
 /**
  * 上下文压缩器
  *
- * 参考: Claude Code 的 compact/autoCompact.ts, microCompact.ts, compact.ts
  *
  * 两阶段压缩：
  * 1. 微压缩（不调 API）：分层清理旧工具结果，零成本
@@ -104,7 +103,6 @@ export class ContextCompactor {
   /**
    * 微压缩（不调 API，零成本）
    *
-   * 参照 $CC/services/compact/microCompact.ts 的分层策略：
    *
    *   阶段 1: 清除「最近N条之外」的「大的只读工具结果」
    *   阶段 2: 若仍超阈值，截断「最近N条之外」的「中等只读工具结果」
@@ -283,7 +281,6 @@ export class ContextCompactor {
 
   /**
    * 完整压缩（调 API）
-   * 参照 $CC/services/compact/prompt.ts 的 BASE_COMPACT_PROMPT
    *
    * 将所有消息压缩为一条 system 级摘要 + 保留最近 N 轮原始对话
    */

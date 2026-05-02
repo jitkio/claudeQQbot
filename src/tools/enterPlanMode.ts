@@ -4,7 +4,6 @@ import type { PermissionModeManager } from '../engine/permission/permissionMode.
 /**
  * EnterPlanMode 的判定 prompt
  *
- * 改编自 $CC/tools/EnterPlanModeTool/prompt.ts 第 23-98 行
  * 简化版（去掉编辑器特有的例子）
  */
 export const ENTER_PLAN_MODE_PROMPT = `当任务真正存在"该怎么做"的歧义、且让用户先确认方向能避免大量返工时，使用这个工具进入规划模式。
@@ -78,7 +77,6 @@ export function enterPlanModeTool(
       // 切换到 plan 模式（复用权限专项的 mode 切换）
       modeManager.setMode(sessionKey, 'plan')
 
-      // 参照 $CC/tools/EnterPlanModeTool/EnterPlanModeTool.ts 第 103-118 行
       // 工具回执里强制注入工作流指令
       return `已进入规划模式。
 

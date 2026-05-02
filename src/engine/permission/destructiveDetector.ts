@@ -8,7 +8,6 @@ interface Rule {
 
 /**
  * 破坏性命令规则库
- * 直接移植 $CC/tools/BashTool/destructiveCommandWarning.ts 第 12-89 行 DESTRUCTIVE_PATTERNS
  * 并新增几条针对 QQ Bot workspace 场景的规则
  */
 const DESTRUCTIVE_RULES: Rule[] = [

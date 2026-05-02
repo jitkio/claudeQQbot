@@ -4,7 +4,6 @@ import { DEFAULT_TODO_REMINDER_CONFIG } from './planningTypes.js'
 /**
  * 判定是否应该在当前轮注入 todo reminder
  *
- * 参照 $CC/utils/attachments.ts 第 3300-3303 行的判定条件：
  *   turnsSinceLastTodoWrite >= TURNS_SINCE_WRITE
  *   AND turnsSinceLastReminder >= TURNS_BETWEEN_REMINDERS
  *
@@ -41,7 +40,6 @@ export class TodoReminderTracker {
   /**
    * 当前是否应该注入 reminder
    *
-   * 严格参照 $CC/utils/attachments.ts 第 3300-3303 行
    */
   shouldInject(currentTodos: TodoList): boolean {
     // 没有任何 todo → 不需要 reminder

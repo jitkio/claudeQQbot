@@ -40,7 +40,6 @@ export interface ToolDef {
 
   /**
    * 是否可以与其他工具并发执行
-   * 参照 $CC/services/tools/toolOrchestration.ts 第 96-108 行的判定逻辑
    *
    * 默认 undefined → 保守视为 false
    *

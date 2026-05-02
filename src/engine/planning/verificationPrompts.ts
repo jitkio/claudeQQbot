@@ -1,7 +1,6 @@
 /**
  * 核验子 Agent 的 system prompt
  *
- * 改编自 $CC/tools/AgentTool/built-in/verificationAgent.ts 第 10-50 行的
  * VERIFICATION_SYSTEM_PROMPT，但简化为 QQ Bot 场景：
  *
  * - 删除"前端/后端/数据库迁移"等编辑器场景策略

@@ -1,7 +1,6 @@
 /**
  * 拒绝追踪器
  *
- * 参考: Claude Code 的 deniedToolUseTracker 机制
  *
  * 目标：session 内被拒绝过的命令/工具调用，bot 不要反复尝试。
  *

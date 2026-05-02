@@ -11,7 +11,6 @@ import { getMaxConcurrency, getDefaultToolTimeout } from './concurrencyConfig.js
 /**
  * 核心调度器：接收一轮 tool_calls，返回一轮 tool_results
  *
- * 参照 $CC/services/tools/toolOrchestration.ts 的 runTools 函数（第 19-82 行）
  * 但不使用 async generator 模式，改用简单的 Promise 聚合
  */
 export class ToolOrchestrator {
@@ -100,7 +99,6 @@ export class ToolOrchestrator {
   /**
    * 把一轮 tool_calls 分成批次
    *
-   * 严格参照 $CC/services/tools/toolOrchestration.ts 第 91-116 行 partitionToolCalls：
    * - 连续的 concurrency-safe 调用合并为一个并发批次
    * - 非并发安全的调用单独成批
    * - 保持原始顺序
@@ -130,7 +128,6 @@ export class ToolOrchestrator {
   /**
    * 判定一次工具调用是否可以并发
    *
-   * 参照 $CC/services/tools/toolOrchestration.ts 第 96-108 行：
    * - 先尝试 parse input
    * - 再调用 tool.isConcurrencySafe(parsedInput)
    * - 任何异常都保守地返回 false
@@ -153,7 +150,6 @@ export class ToolOrchestrator {
   /**
    * 并发执行一个批次
    *
-   * 参照 $CC/services/tools/toolOrchestration.ts 第 152-177 行 runToolsConcurrently
    * 简化：不使用 async generator，直接 Promise.all + 并发度限制
    */
   private async runBatchConcurrently(
@@ -185,7 +181,6 @@ export class ToolOrchestrator {
   /**
    * 串行执行一个批次
    *
-   * 参照 $CC/services/tools/toolOrchestration.ts 第 118-150 行 runToolsSerially
    */
   private async runBatchSerially(
     calls: ToolCallInfo[],

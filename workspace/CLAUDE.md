@@ -47,7 +47,7 @@
 
 ### 3. 互联网搜索 (BrowserTool - Playwright)
 
-搜索策略（源自 Claude Code WebSearchTool）：
+搜索策略：
 - 拆解问题为多个角度的关键词
 - 调研类至少搜 3 个不同角度
 - 搜完用自己的话总结，附来源链接
@@ -146,7 +146,7 @@ node ../tools/file_detect.cjs "文件路径"
 
 复杂任务拆分给子 Agent 并行执行。
 
-**三种内置 Agent（源自 Claude Code AgentTool）：**
+**三种内置 Agent：**
 
 **explore** — 只读搜索专家
 - 快速查找文件、搜索代码、分析代码库
@@ -196,7 +196,7 @@ Agent 使用策略：
 
 ---
 
-## 记忆系统（源自 Claude Code memdir）
+## 记忆系统
 
 你有一个持久化的、基于文件的记忆系统，位于 ./memory/
 
@@ -239,7 +239,7 @@ Agent 使用策略：
 
 ---
 
-## 任务追踪（源自 Claude Code TodoWriteTool）
+## 任务追踪
 
 对于复杂多步骤任务（3步以上），使用任务列表追踪进度：
 

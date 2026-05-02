@@ -4,8 +4,6 @@ import { spawn } from 'child_process'
 import { openSync, closeSync } from 'fs'
 
 /**
- * Claude Code CLI 适配器
- * 保留现有的 spawn claude 方式，不走工具系统（Claude Code 自带工具）
  */
 export class ClaudeCodeAdapter extends ModelAdapter {
   private workDir: string
@@ -15,7 +13,6 @@ export class ClaudeCodeAdapter extends ModelAdapter {
     this.workDir = workDir
   }
 
-  // Claude Code CLI 不需要格式化工具，它自带工具
   formatTools(_tools: ToolDef[]): any[] { return [] }
   parseResponse(raw: any): ModelResponse {
     return { content: String(raw), toolCalls: [], finishReason: 'stop' }

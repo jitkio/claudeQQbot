@@ -6,7 +6,6 @@ import { safeSessionKey } from '../utils/sessionKey.js'
  * TodoList 的会话级存储
  *
  * 每个 sessionKey 一个 JSON 文件，存放当前的 todo 列表。
- * 全部任务完成时，文件内容清空（参照 $CC/tools/TodoWriteTool/TodoWriteTool.ts 第 69-70 行 allDone 处理）。
  */
 export class TodoStore {
   private baseDir: string
@@ -37,12 +36,10 @@ export class TodoStore {
    * 覆盖式写入 —— 这是 TodoWrite 的核心语义：
    * 模型每次调用都传一份完整的列表，旧列表被新列表替换。
    *
-   * 参照 $CC/tools/TodoWriteTool/TodoWriteTool.ts 第 88-94 行：
    *   context.setAppState(prev => ({ ...prev, todos: { [todoKey]: newTodos } }))
    */
   set(sessionKey: string, todos: TodoList): void {
     // 全部完成 → 清空（视为这一段任务结束）
-    // 参照 $CC/tools/TodoWriteTool/TodoWriteTool.ts 第 69-70 行 allDone 逻辑
     const allDone = todos.length > 0 && todos.every(t => t.status === 'completed')
     const toSave = allDone ? [] : todos
 
@@ -57,7 +54,6 @@ export class TodoStore {
   /**
    * 校验 todo 列表的状态约束
    *
-   * 严格参照 $CC/tools/TodoWriteTool/prompt.ts 第 156-159 行的状态管理规则：
    * "Exactly ONE task must be in_progress at any time (not less, not more)"
    *
    * 但如果列表为空或全部完成，则放宽（无 in_progress 也可）
